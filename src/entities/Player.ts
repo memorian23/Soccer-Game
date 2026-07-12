@@ -41,6 +41,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     body.setCollideWorldBounds(false);
     body.setDrag(600, 600);
     body.setMaxSpeed(260);
+    body.pushable = false;
   }
 
   /** Updates facing/rotation and plays the run cycle based on current velocity. Call once per frame. */

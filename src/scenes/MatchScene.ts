@@ -6,21 +6,35 @@ import {
   AI_HOLD_SPEED,
   AI_KICK_COOLDOWN,
   BALL_RADIUS,
+  COVER_CHASE_SPEED_FACTOR,
+  DANGER_ZONE_FRACTION,
   FORMATION,
   GAME_HEIGHT,
   GAME_WIDTH,
+  GK_LINE_OFFSET,
+  GK_MAX_ADVANCE,
+  GK_RUSH_DISTANCE,
   GOAL_BOTTOM,
   GOAL_DEPTH,
   GOAL_TOP,
   HUMAN_KICK_COOLDOWN,
+  JOCKEY_RADIUS,
+  JOCKEY_SLOW_FACTOR,
+  MARK_DISTANCE,
   MATCH_MINUTES,
   PASS_POWER,
   PITCH,
   PITCH_CENTER_X,
   PITCH_CENTER_Y,
+  PITCH_WIDTH,
   PLAYER_RADIUS,
   PLAYER_SPEED,
   POSSESS_RADIUS,
+  PRESS_BLEND_BASE,
+  PRESS_BLEND_DF,
+  PRESS_BLEND_FW,
+  PRESS_BLEND_MF,
+  Role,
   SECONDS_PER_GAME_MINUTE,
   SHOOT_POWER,
 } from "../config";
@@ -44,6 +58,8 @@ export default class MatchScene extends Phaser.Scene {
   private away: Player[] = [];
   private ball!: Ball;
   private ballKickedAt = 0;
+  private staleCheckPos = new Phaser.Math.Vector2();
+  private staleSince = 0;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: { up: Phaser.Input.Keyboard.Key; down: Phaser.Input.Keyboard.Key; left: Phaser.Input.Keyboard.Key; right: Phaser.Input.Keyboard.Key };
@@ -129,6 +145,8 @@ export default class MatchScene extends Phaser.Scene {
     this.createTeams();
     this.ball = new Ball(this, PITCH_CENTER_X, PITCH_CENTER_Y, "ball");
     this.ball.setDepth(5);
+    // Lets a flying shot/pass bounce off any player's body (crucial for keeper saves / blocks).
+    this.physics.add.collider(this.ball, [...this.home, ...this.away]);
 
     this.controlIndicator = this.add.graphics();
     this.controlIndicator.setDepth(6);
@@ -256,6 +274,34 @@ export default class MatchScene extends Phaser.Scene {
     });
     this.ball.setPosition(PITCH_CENTER_X, PITCH_CENTER_Y);
     (this.ball.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+    this.staleCheckPos.set(PITCH_CENTER_X, PITCH_CENTER_Y);
+    this.staleSince = this.time.now;
+  }
+
+  /**
+   * Anti-deadlock safeguard: a marked ball carrier squeezed against a boundary (most often a
+   * corner) can get stuck in a tug-of-war with a defender, with possession flip-flopping every
+   * frame and the ball barely moving. If it hasn't travelled meaningfully in a few seconds,
+   * nudge it back toward open space with no velocity so play can restart cleanly.
+   */
+  private breakStalemateIfStuck(now: number) {
+    const moved = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.staleCheckPos.x, this.staleCheckPos.y);
+    if (moved > 45) {
+      this.staleCheckPos.set(this.ball.x, this.ball.y);
+      this.staleSince = now;
+      return;
+    }
+    if (now - this.staleSince <= 3500) return;
+
+    const dx = PITCH_CENTER_X - this.ball.x;
+    const dy = PITCH_CENTER_Y - this.ball.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = Phaser.Math.Clamp(this.ball.x + (dx / len) * 130, PITCH.left + 40, PITCH.right - 40);
+    const ny = Phaser.Math.Clamp(this.ball.y + (dy / len) * 130, PITCH.top + 40, PITCH.bottom - 40);
+    this.ball.setPosition(nx, ny);
+    (this.ball.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+    this.staleCheckPos.set(nx, ny);
+    this.staleSince = now;
   }
 
   private nearest(players: Player[], point: { x: number; y: number }): { player: Player; d: number } {
@@ -283,15 +329,74 @@ export default class MatchScene extends Phaser.Scene {
     body.setVelocity((dx / d) * speed, (dy / d) * speed);
   }
 
-  private holdFormationTarget(p: Player): { x: number; y: number } {
+  private holdFormationTarget(p: Player, blend: number = PRESS_BLEND_BASE): { x: number; y: number } {
     const slotX = PITCH.left + p.homeSlot.fx * (PITCH.right - PITCH.left);
     const slotY = PITCH.top + p.homeSlot.fy * (PITCH.bottom - PITCH.top);
-    const blend = 0.15;
     const x = Phaser.Math.Linear(slotX, this.ball.x, blend);
     const y = Phaser.Math.Linear(slotY, this.ball.y, blend);
     const target = { x, y };
     clampToPitch(target);
     return target;
+  }
+
+  private pressBlendForRole(role: Role): number {
+    if (role === "DF") return PRESS_BLEND_DF;
+    if (role === "MF") return PRESS_BLEND_MF;
+    return PRESS_BLEND_FW;
+  }
+
+  /** Positions a covering defender goal-side of the ball, at marking distance rather than on top of it. */
+  private markingTarget(p: Player): { x: number; y: number } {
+    const ownGoalX = p.team === "home" ? PITCH.left : PITCH.right;
+    const dx = ownGoalX - this.ball.x;
+    const dy = PITCH_CENTER_Y - this.ball.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const target = {
+      x: this.ball.x + (dx / len) * MARK_DISTANCE,
+      y: this.ball.y + (dy / len) * MARK_DISTANCE,
+    };
+    clampToPitch(target);
+    return target;
+  }
+
+  /** Keeper hugs the goal line, tracks the ball vertically, and only rushes out when a shot/loose ball is close. */
+  private goalkeeperTarget(p: Player): { x: number; y: number } {
+    const ownGoalX = p.team === "home" ? PITCH.left : PITCH.right;
+    const forward = p.team === "home" ? 1 : -1;
+    const lineX = ownGoalX + forward * GK_LINE_OFFSET;
+    const maxAdvanceX = ownGoalX + forward * GK_MAX_ADVANCE;
+
+    const distToGoalMouth = dist(this.ball, { x: ownGoalX, y: PITCH_CENTER_Y });
+    const rushT = Phaser.Math.Clamp(1 - distToGoalMouth / GK_RUSH_DISTANCE, 0, 1);
+    const targetX = Phaser.Math.Linear(lineX, maxAdvanceX, rushT * 0.7);
+    const targetY = Phaser.Math.Clamp(this.ball.y, GOAL_TOP + 8, GOAL_BOTTOM - 8);
+
+    const target = { x: targetX, y: targetY };
+    clampToPitch(target);
+    return target;
+  }
+
+  /**
+   * Moves every non-primary teammate: the closest one presses the ball directly when the
+   * opponent controls it in this team's danger zone, others compress their formation shape
+   * toward the ball (more so for defenders), and the goalkeeper always uses its own logic.
+   */
+  private updateSupportPlayers(team: Player[], primary: Player, opponentHasBall: boolean, dangerZone: boolean) {
+    const others = team.filter((p) => p !== primary);
+    others.sort((a, b) => dist(a, this.ball) - dist(b, this.ball));
+
+    others.forEach((p, idx) => {
+      if (p.role === "GK") {
+        this.seek(p, this.goalkeeperTarget(p), AI_HOLD_SPEED);
+        return;
+      }
+      if (opponentHasBall && dangerZone && idx === 0) {
+        this.seek(p, this.markingTarget(p), AI_CHASE_SPEED * COVER_CHASE_SPEED_FACTOR);
+        return;
+      }
+      const blend = opponentHasBall && dangerZone ? this.pressBlendForRole(p.role) : PRESS_BLEND_BASE;
+      this.seek(p, this.holdFormationTarget(p, blend), AI_HOLD_SPEED);
+    });
   }
 
   private glueBallTo(p: Player) {
@@ -309,6 +414,45 @@ export default class MatchScene extends Phaser.Scene {
     (this.ball.body as Phaser.Physics.Arcade.Body).setVelocity(n.x * power, n.y * power);
     this.ballKickedAt = now;
     p.kickCooldownUntil = now + (p.team === "home" ? HUMAN_KICK_COOLDOWN : AI_KICK_COOLDOWN);
+  }
+
+  /**
+   * Baseline AI for whichever player currently has the ball and isn't under direct human
+   * control: dribble toward the opponent's goal (slowed if tightly marked), shoot once close
+   * enough, or occasionally lay it off to a more advanced teammate. Used for the away team
+   * at all times, and for the home team whenever the human isn't actively pressing a key -
+   * without this, an idle human carrier would simply stand still holding the ball forever.
+   */
+  private aiDribbleAndShoot(carrier: Player, now: number, opponents: Player[]) {
+    const attackingRight = carrier.team === "home";
+    const goal = { x: attackingRight ? PITCH.right + 10 : PITCH.left - 10, y: PITCH_CENTER_Y };
+    const dribbleDir = new Phaser.Math.Vector2(goal.x - carrier.x, goal.y - carrier.y).normalize();
+    const marker = this.nearest(opponents, carrier).d;
+    const jockeyScale = marker < JOCKEY_RADIUS ? JOCKEY_SLOW_FACTOR : 1;
+    const v = dribbleDir.scale(AI_CHASE_SPEED * 0.92 * jockeyScale);
+    (carrier.body as Phaser.Physics.Arcade.Body).setVelocity(v.x, v.y);
+    carrier.facing.set(dribbleDir.x, dribbleDir.y);
+    this.glueBallTo(carrier);
+
+    if (!carrier.canKick(now)) return;
+
+    const distToGoal = dist(carrier, goal);
+    if (distToGoal < 240) {
+      const spread = Phaser.Math.FloatBetween(-0.22, 0.22);
+      const aim = new Phaser.Math.Vector2(goal.x - carrier.x, goal.y - carrier.y + spread * 160);
+      this.kickBall(carrier, aim, SHOOT_POWER * 0.95, now);
+      return;
+    }
+
+    if (Phaser.Math.Between(0, 1000) < 6) {
+      const own = carrier.team === "home" ? this.home : this.away;
+      const teammates = own.filter((p) => p !== carrier && (attackingRight ? p.x > carrier.x - 40 : p.x < carrier.x + 40));
+      if (teammates.length > 0) {
+        const target = this.nearest(teammates, goal).player;
+        const dir = new Phaser.Math.Vector2(target.x - carrier.x, target.y - carrier.y);
+        this.kickBall(carrier, dir, PASS_POWER, now);
+      }
+    }
   }
 
   private handleGoalCheck() {
@@ -339,30 +483,30 @@ export default class MatchScene extends Phaser.Scene {
     this.scoreText.setText(`HOME ${this.scoreHome} : ${this.scoreAway} AWAY`);
   }
 
+  /**
+   * Keeps the ball on the pitch. Anything that leaves through a touchline, or through the
+   * end line outside the goal mouth, is treated like a throw-in/goal-kick: it's placed back
+   * in open space with no velocity instead of bouncing, which used to let it get trapped
+   * oscillating in a corner pocket between the two boundary checks with players jammed
+   * around it. Inside the goal mouth it's still allowed to travel on into the net.
+   */
   private constrainBall() {
     const body = this.ball.body as Phaser.Physics.Arcade.Body;
 
-    if (this.ball.y < PITCH.top + BALL_RADIUS) {
-      this.ball.y = PITCH.top + BALL_RADIUS;
-      body.velocity.y *= -0.6;
-    }
-    if (this.ball.y > PITCH.bottom - BALL_RADIUS) {
-      this.ball.y = PITCH.bottom - BALL_RADIUS;
-      body.velocity.y *= -0.6;
-    }
-
     const inGoalMouthY = this.ball.y > GOAL_TOP + BALL_RADIUS && this.ball.y < GOAL_BOTTOM - BALL_RADIUS;
+    const crossedTouchline = this.ball.y < PITCH.top + BALL_RADIUS || this.ball.y > PITCH.bottom - BALL_RADIUS;
+    const crossedEndlineOutsideGoal = !inGoalMouthY && (this.ball.x < PITCH.left + BALL_RADIUS || this.ball.x > PITCH.right - BALL_RADIUS);
 
-    if (!inGoalMouthY) {
-      if (this.ball.x < PITCH.left + BALL_RADIUS) {
-        this.ball.x = PITCH.left + BALL_RADIUS;
-        body.velocity.x *= -0.6;
-      }
-      if (this.ball.x > PITCH.right - BALL_RADIUS) {
-        this.ball.x = PITCH.right - BALL_RADIUS;
-        body.velocity.x *= -0.6;
-      }
-    } else {
+    if (crossedTouchline || crossedEndlineOutsideGoal) {
+      const margin = 26;
+      const x = Phaser.Math.Clamp(this.ball.x, PITCH.left + margin, PITCH.right - margin);
+      const y = Phaser.Math.Clamp(this.ball.y, PITCH.top + margin, PITCH.bottom - margin);
+      this.ball.setPosition(x, y);
+      body.setVelocity(0, 0);
+      return;
+    }
+
+    if (inGoalMouthY) {
       if (this.ball.x < PITCH.left - GOAL_DEPTH + BALL_RADIUS) {
         this.ball.x = PITCH.left - GOAL_DEPTH + BALL_RADIUS;
         body.velocity.x *= -0.4;
@@ -425,11 +569,21 @@ export default class MatchScene extends Phaser.Scene {
     if (this.cursors.up.isDown || this.wasd.up.isDown) iy -= 1;
     if (this.cursors.down.isDown || this.wasd.down.isDown) iy += 1;
 
+    let controlledSpeedScale = 1;
+    if (hasCarrier && carrier === controlledPlayer) {
+      const marker = this.nearest(this.away, controlledPlayer).d;
+      if (marker < JOCKEY_RADIUS) controlledSpeedScale = JOCKEY_SLOW_FACTOR;
+    }
+
     const body = controlledPlayer.body as Phaser.Physics.Arcade.Body;
     if (ix !== 0 || iy !== 0) {
-      const v = new Phaser.Math.Vector2(ix, iy).normalize().scale(PLAYER_SPEED);
+      const v = new Phaser.Math.Vector2(ix, iy).normalize().scale(PLAYER_SPEED * controlledSpeedScale);
       body.setVelocity(v.x, v.y);
       controlledPlayer.facing.set(ix, iy).normalize();
+    } else if (!hasCarrier || carrier !== controlledPlayer) {
+      // No manual input right now: auto-press the ball so the nearest defender never
+      // stands idle while the human reacts. Any key press instantly takes back control.
+      this.seek(controlledPlayer, this.ball, AI_CHASE_SPEED * controlledSpeedScale);
     } else {
       body.setVelocity(0, 0);
     }
@@ -439,18 +593,20 @@ export default class MatchScene extends Phaser.Scene {
       this.seek(awayNearest.player, this.ball, AI_CHASE_SPEED);
     }
 
-    // ---- Hold-formation support for everyone else ----
-    for (const p of this.home) {
-      if (p === controlledPlayer) continue;
-      this.seek(p, this.holdFormationTarget(p), AI_HOLD_SPEED);
-    }
-    for (const p of this.away) {
-      if (p === awayNearest.player) continue;
-      this.seek(p, this.holdFormationTarget(p), AI_HOLD_SPEED);
-    }
+    // ---- Support players: press when defending the danger zone, else hold shape ----
+    const ballFxHome = (this.ball.x - PITCH.left) / PITCH_WIDTH;
+    const homeDangerZone = ballFxHome < DANGER_ZONE_FRACTION;
+    const awayDangerZone = ballFxHome > 1 - DANGER_ZONE_FRACTION;
+    const awayHasBall = hasCarrier && carrier.team === "away";
+    const homeHasBall = hasCarrier && carrier.team === "home";
+
+    this.updateSupportPlayers(this.home, controlledPlayer, awayHasBall, homeDangerZone);
+    this.updateSupportPlayers(this.away, awayNearest.player, homeHasBall, awayDangerZone);
 
     // ---- Carrier behaviour ----
-    if (hasCarrier && carrier === controlledPlayer) {
+    const humanActingOnBall = (ix !== 0 || iy !== 0) || Phaser.Input.Keyboard.JustDown(this.shootKey) || Phaser.Input.Keyboard.JustDown(this.passKey);
+
+    if (hasCarrier && carrier === controlledPlayer && humanActingOnBall) {
       this.glueBallTo(carrier);
       if (Phaser.Input.Keyboard.JustDown(this.shootKey) && carrier.canKick(now)) {
         const dir = new Phaser.Math.Vector2(PITCH.right + 10 - carrier.x, PITCH_CENTER_Y - carrier.y);
@@ -461,35 +617,18 @@ export default class MatchScene extends Phaser.Scene {
         const dir = new Phaser.Math.Vector2(target.x - carrier.x, target.y - carrier.y);
         this.kickBall(carrier, dir, PASS_POWER, now);
       }
+    } else if (hasCarrier && carrier === controlledPlayer) {
+      // Human isn't actively directing this possession right now - let a baseline AI
+      // attack instead of freezing in place. Any key press resumes manual control at once.
+      this.aiDribbleAndShoot(carrier, now, this.away);
     } else if (hasCarrier && carrier === awayNearest.player) {
-      const goal = { x: PITCH.left - 10, y: PITCH_CENTER_Y };
-      const toGoal = new Phaser.Math.Vector2(goal.x - carrier.x, goal.y - carrier.y);
-      const dribbleDir = toGoal.clone().normalize();
-      const v = dribbleDir.scale(AI_CHASE_SPEED * 0.92);
-      (carrier.body as Phaser.Physics.Arcade.Body).setVelocity(v.x, v.y);
-      carrier.facing.set(dribbleDir.x, dribbleDir.y);
-      this.glueBallTo(carrier);
-
-      const distToGoal = dist(carrier, goal);
-      if (carrier.canKick(now)) {
-        if (distToGoal < 240) {
-          const spread = Phaser.Math.FloatBetween(-0.22, 0.22);
-          const aim = new Phaser.Math.Vector2(goal.x - carrier.x, goal.y - carrier.y + spread * 160);
-          this.kickBall(carrier, aim, SHOOT_POWER * 0.95, now);
-        } else if (Phaser.Math.Between(0, 1000) < 6) {
-          const teammates = this.away.filter((p) => p !== carrier && p.x < carrier.x + 40);
-          if (teammates.length > 0) {
-            const target = this.nearest(teammates, goal).player;
-            const dir = new Phaser.Math.Vector2(target.x - carrier.x, target.y - carrier.y);
-            this.kickBall(carrier, dir, PASS_POWER, now);
-          }
-        }
-      }
+      this.aiDribbleAndShoot(carrier, now, this.home);
     }
 
     // ---- Physics / bounds ----
     this.constrainBall();
     this.handleGoalCheck();
+    this.breakStalemateIfStuck(now);
 
     const ballSpeed = (this.ball.body as Phaser.Physics.Arcade.Body).velocity.length();
     this.ball.rotation += (ballSpeed / PLAYER_RADIUS) * (delta / 1000);

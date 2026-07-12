@@ -58,3 +58,32 @@ export const HUMAN_KICK_COOLDOWN = 260;
 
 export const MATCH_MINUTES = 90;
 export const SECONDS_PER_GAME_MINUTE = 0.9; // real seconds per in-game minute
+
+// ---- Defensive AI ----
+// How far a defending team pulls its formation toward the ball when NOT under pressure.
+export const PRESS_BLEND_BASE = 0.15;
+// Blend used for shape-compression (non-covering) players once the opponent has the ball
+// deep in this team's own zone. Defenders tuck in tightest, forwards barely track back.
+export const PRESS_BLEND_DF = 0.42;
+export const PRESS_BLEND_MF = 0.28;
+export const PRESS_BLEND_FW = 0.12;
+// Fraction of the pitch (measured from a team's own goal, 0..1) that counts as "danger" -
+// i.e. worth stepping up to press rather than just holding shape.
+export const DANGER_ZONE_FRACTION = 0.62;
+// The single closest covering teammate (besides the primary marker) sprints straight at
+// the ball instead of holding a blended slot when the opponent is in the danger zone.
+export const COVER_CHASE_SPEED_FACTOR = 0.95;
+
+// A tightly marked ball carrier (opponent within this radius) dribbles slower, giving
+// defenders a realistic chance to close down and dispossess instead of being outrun.
+export const JOCKEY_RADIUS = 30;
+export const JOCKEY_SLOW_FACTOR = 0.55;
+// The covering defender holds this far off the ball on the goal side rather than running
+// straight onto it - close enough to jockey/tackle, far enough that a shot can still be
+// struck instead of colliding with the marker's body at point-blank range every time.
+export const MARK_DISTANCE = 24;
+
+// Goalkeeper positioning.
+export const GK_LINE_OFFSET = 16; // stands this far off the goal line by default
+export const GK_MAX_ADVANCE = 90; // furthest the keeper will rush out to close down a shooter
+export const GK_RUSH_DISTANCE = 150; // ball-to-goal distance at which the keeper starts rushing out
