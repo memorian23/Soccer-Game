@@ -1,4 +1,7 @@
 import Phaser from "phaser";
+import MenuScene from "./scenes/MenuScene";
+import TacticsScene from "./scenes/TacticsScene";
+import SquadScene from "./scenes/SquadScene";
 import MatchScene from "./scenes/MatchScene";
 import { GAME_HEIGHT, GAME_WIDTH } from "./config";
 
@@ -15,5 +18,5 @@ new Phaser.Game({
       debug: false,
     },
   },
-  scene: [MatchScene],
+  scene: [MenuScene, TacticsScene, SquadScene, MatchScene],
 });

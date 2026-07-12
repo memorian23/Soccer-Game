@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import Player from "../entities/Player";
 import Ball from "../entities/Ball";
+import { FORMATIONS } from "../data/formations";
+import { teamState } from "../state/teamState";
 import {
   AI_CHASE_SPEED,
   AI_HOLD_SPEED,
@@ -8,7 +10,7 @@ import {
   BALL_RADIUS,
   COVER_CHASE_SPEED_FACTOR,
   DANGER_ZONE_FRACTION,
-  FORMATION,
+  FormationSlot,
   GAME_HEIGHT,
   GAME_WIDTH,
   GK_LINE_OFFSET,
@@ -56,6 +58,8 @@ function clampToPitch(p: { x: number; y: number }) {
 export default class MatchScene extends Phaser.Scene {
   private home: Player[] = [];
   private away: Player[] = [];
+  private homeSlots: FormationSlot[] = [];
+  private awaySlots: FormationSlot[] = [];
   private ball!: Ball;
   private ballKickedAt = 0;
   private staleCheckPos = new Phaser.Math.Vector2();
@@ -66,6 +70,7 @@ export default class MatchScene extends Phaser.Scene {
   private shootKey!: Phaser.Input.Keyboard.Key;
   private passKey!: Phaser.Input.Keyboard.Key;
   private restartKey!: Phaser.Input.Keyboard.Key;
+  private menuKey!: Phaser.Input.Keyboard.Key;
 
   private scoreHome = 0;
   private scoreAway = 0;
@@ -92,6 +97,10 @@ export default class MatchScene extends Phaser.Scene {
 
   /** Procedurally draws a 4-frame top-down running cycle (legs swing, body + facing dot) for a team/role. */
   private buildPlayerFrames(key: string, fill: number, stroke: number) {
+    // Re-entering this scene (menu -> match -> menu -> match) re-runs preload(); textures
+    // and animations only need to be generated once.
+    if (this.textures.exists(`${key}_f0`)) return;
+
     const fillColor = Phaser.Display.Color.IntegerToColor(fill);
     const legColor = fillColor.clone().darken(35).color;
     const luminance = 0.299 * fillColor.red + 0.587 * fillColor.green + 0.114 * fillColor.blue;
@@ -131,6 +140,8 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private buildBallTexture() {
+    if (this.textures.exists("ball")) return;
+
     const g = this.add.graphics();
     g.fillStyle(0xffffff, 1);
     g.fillCircle(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
@@ -141,6 +152,21 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   create() {
+    // Re-entering this scene (menu -> match -> menu -> match) reuses the same Scene
+    // instance, so plain JS fields from a previous match must be reset by hand.
+    this.home = [];
+    this.away = [];
+    this.homeSlots = [];
+    this.awaySlots = [];
+    this.ballKickedAt = 0;
+    this.staleCheckPos.set(0, 0);
+    this.staleSince = 0;
+    this.scoreHome = 0;
+    this.scoreAway = 0;
+    this.elapsedRealSeconds = 0;
+    this.matchOver = false;
+    this.frozen = false;
+
     this.drawPitch();
     this.createTeams();
     this.ball = new Ball(this, PITCH_CENTER_X, PITCH_CENTER_Y, "ball");
@@ -161,6 +187,7 @@ export default class MatchScene extends Phaser.Scene {
     this.shootKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.passKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.restartKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+    this.menuKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M);
 
     this.scoreText = this.add
       .text(GAME_WIDTH / 2, 30, "HOME 0 : 0 AWAY", {
@@ -190,7 +217,7 @@ export default class MatchScene extends Phaser.Scene {
       .setDepth(10);
 
     this.add
-      .text(10, GAME_HEIGHT - 24, "이동: WASD/방향키   슛: Space   패스: Shift   재시작: R", {
+      .text(10, GAME_HEIGHT - 24, "이동: WASD/방향키   슛: Space   패스: Shift   재시작: R   메뉴: M", {
         fontFamily: "Arial",
         fontSize: "13px",
         color: "#9fd8b0",
@@ -243,33 +270,41 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private createTeams() {
-    FORMATION.forEach((slot, i) => {
+    // Home uses whatever formation/lineup was chosen on the tactics & squad screens; away
+    // always fields the default 4-4-2 opponent.
+    const lineup = teamState.getLineup();
+    this.homeSlots = lineup.map((entry) => entry.slot);
+    lineup.forEach(({ slot, player }, i) => {
       const hx = PITCH.left + slot.fx * (PITCH.right - PITCH.left);
       const hy = PITCH.top + slot.fy * (PITCH.bottom - PITCH.top);
+      const homeKey = slot.role === "GK" ? "homeGK" : "home";
+      const h = new Player(this, hx, hy, homeKey, "home", slot.role, i, { fx: slot.fx, fy: slot.fy }, player?.name);
+      h.setDepth(4);
+      this.home.push(h);
+    });
+
+    this.awaySlots = FORMATIONS["442"].slots;
+    this.awaySlots.forEach((slot, i) => {
       const ax = PITCH.left + (1 - slot.fx) * (PITCH.right - PITCH.left);
       const ay = PITCH.top + slot.fy * (PITCH.bottom - PITCH.top);
-
-      const homeKey = slot.role === "GK" ? "homeGK" : "home";
       const awayKey = slot.role === "GK" ? "awayGK" : "away";
-
-      const h = new Player(this, hx, hy, homeKey, "home", slot.role, i, { fx: slot.fx, fy: slot.fy });
       const a = new Player(this, ax, ay, awayKey, "away", slot.role, i, { fx: 1 - slot.fx, fy: slot.fy });
-      h.setDepth(4);
       a.setDepth(4);
-      this.home.push(h);
       this.away.push(a);
     });
   }
 
   private kickoffReset() {
-    FORMATION.forEach((slot, i) => {
+    this.homeSlots.forEach((slot, i) => {
       const h = this.home[i];
-      const a = this.away[i];
       h.setPosition(PITCH.left + slot.fx * (PITCH.right - PITCH.left), PITCH.top + slot.fy * (PITCH.bottom - PITCH.top));
-      a.setPosition(PITCH.left + (1 - slot.fx) * (PITCH.right - PITCH.left), PITCH.top + slot.fy * (PITCH.bottom - PITCH.top));
       (h.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
-      (a.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
       h.facing.set(1, 0);
+    });
+    this.awaySlots.forEach((slot, i) => {
+      const a = this.away[i];
+      a.setPosition(PITCH.left + (1 - slot.fx) * (PITCH.right - PITCH.left), PITCH.top + slot.fy * (PITCH.bottom - PITCH.top));
+      (a.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
       a.facing.set(-1, 0);
     });
     this.ball.setPosition(PITCH_CENTER_X, PITCH_CENTER_Y);
@@ -519,6 +554,11 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number) {
+    if (Phaser.Input.Keyboard.JustDown(this.menuKey)) {
+      this.scene.start("menu");
+      return;
+    }
+
     if (this.matchOver) return;
 
     const now = this.time.now;

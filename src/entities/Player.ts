@@ -23,12 +23,14 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     role: Role,
     index: number,
     homeSlot: { fx: number; fy: number },
+    name?: string,
   ) {
     super(scene, x, y, `${baseKey}_f0`);
     this.team = team;
     this.role = role;
     this.index = index;
     this.homeSlot = homeSlot;
+    this.name = name ?? "";
     this.baseKey = baseKey;
     this.runAnimKey = `${baseKey}_run`;
 
