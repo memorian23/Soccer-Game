@@ -95,3 +95,12 @@ export const MARK_DISTANCE = 15;
 export const GK_LINE_OFFSET = 16; // stands this far off the goal line by default
 export const GK_MAX_ADVANCE = 90; // furthest the keeper will rush out to close down a shooter
 export const GK_RUSH_DISTANCE = 150; // ball-to-goal distance at which the keeper starts rushing out
+
+// ---- Opponent difficulty ----
+// The AI opponent (away) was winning the ball back and finishing too reliably against a human
+// player. These only soften the away team specifically - the human's own AI teammates (home)
+// keep their full defensive/attacking strength so they're still useful support.
+export const AWAY_PRESS_STRENGTH = 0.7; // multiplies away's press-blend and cover-chase-speed
+export const AWAY_CHASE_SPEED_MULT = 0.88; // away's speed when closing down a loose ball
+export const AWAY_SHOT_SPREAD = 0.4; // radians of random aim error on an away shot (was ~0.22)
+export const AWAY_SHOT_POWER_MULT = 0.8; // away's shot power as a fraction of SHOOT_POWER

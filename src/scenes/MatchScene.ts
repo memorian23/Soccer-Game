@@ -11,6 +11,10 @@ import {
   AI_CHASE_SPEED,
   AI_HOLD_SPEED,
   AI_KICK_COOLDOWN,
+  AWAY_CHASE_SPEED_MULT,
+  AWAY_PRESS_STRENGTH,
+  AWAY_SHOT_POWER_MULT,
+  AWAY_SHOT_SPREAD,
   BALL_RADIUS,
   COVER_CHASE_SPEED_FACTOR,
   DANGER_ZONE_FRACTION,
@@ -525,7 +529,7 @@ export default class MatchScene extends Phaser.Scene {
    * opponent controls it in this team's danger zone, others compress their formation shape
    * toward the ball (more so for defenders), and the goalkeeper always uses its own logic.
    */
-  private updateSupportPlayers(team: Player[], primary: Player, opponentHasBall: boolean, dangerZone: boolean) {
+  private updateSupportPlayers(team: Player[], primary: Player, opponentHasBall: boolean, dangerZone: boolean, pressStrength: number = 1) {
     const others = team.filter((p) => p !== primary);
     others.sort((a, b) => dist(a, this.ball) - dist(b, this.ball));
 
@@ -535,10 +539,10 @@ export default class MatchScene extends Phaser.Scene {
         return;
       }
       if (opponentHasBall && dangerZone && idx === 0) {
-        this.seek(p, this.markingTarget(p), AI_CHASE_SPEED * COVER_CHASE_SPEED_FACTOR);
+        this.seek(p, this.markingTarget(p), AI_CHASE_SPEED * COVER_CHASE_SPEED_FACTOR * pressStrength);
         return;
       }
-      const blend = opponentHasBall && dangerZone ? this.pressBlendForRole(p.role) : PRESS_BLEND_BASE;
+      const blend = opponentHasBall && dangerZone ? this.pressBlendForRole(p.role) * pressStrength : PRESS_BLEND_BASE;
       this.seek(p, this.holdFormationTarget(p, blend), AI_HOLD_SPEED);
     });
   }
@@ -591,9 +595,13 @@ export default class MatchScene extends Phaser.Scene {
 
     const distToGoal = dist(carrier, goal);
     if (distToGoal < 240) {
-      const spread = Phaser.Math.FloatBetween(-0.22, 0.22);
+      // The away opponent aims and strikes the ball noticeably worse than home's own AI, so a
+      // human defending against it has a real chance the shot goes wide or lacks power.
+      const spreadRange = carrier.team === "away" ? AWAY_SHOT_SPREAD : 0.22;
+      const powerMult = carrier.team === "away" ? AWAY_SHOT_POWER_MULT : 0.95;
+      const spread = Phaser.Math.FloatBetween(-spreadRange, spreadRange);
       const aim = new Phaser.Math.Vector2(goal.x - carrier.x, goal.y - carrier.y + spread * 160);
-      this.kickBall(carrier, aim, SHOOT_POWER * 0.95, now);
+      this.kickBall(carrier, aim, SHOOT_POWER * powerMult, now);
       return;
     }
 
@@ -765,7 +773,7 @@ export default class MatchScene extends Phaser.Scene {
 
     // ---- AI: away nearest player (chase or dribble) ----
     if (awayNearest.player !== carrier || !hasCarrier) {
-      this.seek(awayNearest.player, this.ball, AI_CHASE_SPEED);
+      this.seek(awayNearest.player, this.ball, AI_CHASE_SPEED * AWAY_CHASE_SPEED_MULT);
     }
 
     // ---- Support players: press when defending the danger zone, else hold shape ----
@@ -775,8 +783,10 @@ export default class MatchScene extends Phaser.Scene {
     const awayHasBall = hasCarrier && carrier.team === "away";
     const homeHasBall = hasCarrier && carrier.team === "home";
 
+    // Home's AI teammates keep full strength; the away opponent is deliberately softened
+    // (see AWAY_PRESS_STRENGTH) so a human player has room to dribble/attack past them.
     this.updateSupportPlayers(this.home, controlledPlayer, awayHasBall, homeDangerZone);
-    this.updateSupportPlayers(this.away, awayNearest.player, homeHasBall, awayDangerZone);
+    this.updateSupportPlayers(this.away, awayNearest.player, homeHasBall, awayDangerZone, AWAY_PRESS_STRENGTH);
 
     // ---- Carrier behaviour ----
     const humanActingOnBall = (ix !== 0 || iy !== 0) || Phaser.Input.Keyboard.JustDown(this.shootKey) || Phaser.Input.Keyboard.JustDown(this.passKey);
