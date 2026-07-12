@@ -456,8 +456,12 @@ export default class MatchScene extends Phaser.Scene {
   private glueBallTo(p: Player) {
     const body = p.body as Phaser.Physics.Arcade.Body;
     const offset = PLAYER_RADIUS + BALL_RADIUS + 3;
-    const targetX = p.x + p.facing.x * offset;
-    const targetY = p.y + p.facing.y * offset;
+    // Clamp the dribble target to stay inside the pitch. Without this, a carrier hugging a
+    // touchline/corner would glue the ball just past the boundary, constrainBall() would snap
+    // it back in, and the two would fight every frame - looking like the ball teleporting
+    // back and forth while drifting into the corner.
+    const targetX = Phaser.Math.Clamp(p.x + p.facing.x * offset, PITCH.left + BALL_RADIUS, PITCH.right - BALL_RADIUS);
+    const targetY = Phaser.Math.Clamp(p.y + p.facing.y * offset, PITCH.top + BALL_RADIUS, PITCH.bottom - BALL_RADIUS);
     this.ball.x = Phaser.Math.Linear(this.ball.x, targetX, 0.45);
     this.ball.y = Phaser.Math.Linear(this.ball.y, targetY, 0.45);
     (this.ball.body as Phaser.Physics.Arcade.Body).setVelocity(body.velocity.x, body.velocity.y);
@@ -484,9 +488,13 @@ export default class MatchScene extends Phaser.Scene {
     const dribbleDir = new Phaser.Math.Vector2(goal.x - carrier.x, goal.y - carrier.y).normalize();
     const marker = this.nearest(opponents, carrier).d;
     const jockeyScale = marker < JOCKEY_RADIUS ? JOCKEY_SLOW_FACTOR : 1;
+    // Vector2#scale mutates in place, so capture facing (a unit vector) before scaling the
+    // same object down into a velocity - otherwise facing ends up with the velocity's
+    // magnitude instead of length 1, and glueBallTo's offset (facing * ~24px) explodes into
+    // hundreds of pixels, flinging the ball across the pitch.
+    carrier.facing.set(dribbleDir.x, dribbleDir.y);
     const v = dribbleDir.scale(AI_CHASE_SPEED * 0.92 * jockeyScale);
     (carrier.body as Phaser.Physics.Arcade.Body).setVelocity(v.x, v.y);
-    carrier.facing.set(dribbleDir.x, dribbleDir.y);
     this.glueBallTo(carrier);
 
     if (!carrier.canKick(now)) return;
