@@ -1,6 +1,7 @@
 import { FormationSlot, Role } from "../config";
-import { DEFAULT_SQUAD, PlayerProfile } from "../data/squad";
-import { FORMATIONS, FormationId, roleCounts } from "../data/formations";
+import { DEFAULT_SQUAD, PlayerProfile, STARTING_BUDGET } from "../data/squad";
+import { FORMATIONS, FormationId, maxRoleCounts, roleCounts } from "../data/formations";
+import { MarketPlayer } from "../data/market";
 
 const ROLES: Role[] = ["GK", "DF", "MF", "FW"];
 
@@ -19,6 +20,8 @@ class TeamState {
   squad: PlayerProfile[] = DEFAULT_SQUAD;
   private formationId: FormationId = "442";
   private startingIds: string[] = [];
+  private budget = STARTING_BUDGET;
+  private signedMarketIds = new Set<string>();
 
   constructor() {
     this.rebuildStarting();
@@ -82,6 +85,49 @@ class TeamState {
       slot,
       player: byRole[slot.role][cursor[slot.role]++],
     }));
+  }
+
+  getBudget(): number {
+    return this.budget;
+  }
+
+  isSigned(marketId: string): boolean {
+    return this.signedMarketIds.has(marketId);
+  }
+
+  /** Signs a market player onto the bench if the budget allows it. Returns whether it happened. */
+  signPlayer(marketPlayer: MarketPlayer): boolean {
+    if (this.signedMarketIds.has(marketPlayer.id) || this.budget < marketPlayer.price) return false;
+
+    this.budget -= marketPlayer.price;
+    this.signedMarketIds.add(marketPlayer.id);
+    this.squad.push({
+      id: marketPlayer.id,
+      name: marketPlayer.name,
+      number: marketPlayer.number,
+      role: marketPlayer.role,
+      rating: marketPlayer.rating,
+    });
+    return true;
+  }
+
+  /**
+   * Releases a squad player for a partial refund. Blocked if it would leave the squad short
+   * of that role for the most demanding formation preset. Returns whether it happened.
+   */
+  releasePlayer(id: string): boolean {
+    const player = this.squad.find((p) => p.id === id);
+    if (!player) return false;
+
+    const countOfRole = this.squad.filter((p) => p.role === player.role).length;
+    const minNeeded = maxRoleCounts()[player.role];
+    if (countOfRole - 1 < minNeeded) return false;
+
+    this.squad = this.squad.filter((p) => p.id !== id);
+    this.signedMarketIds.delete(id);
+    this.budget += Math.round(player.rating * 1.2);
+    this.rebuildStarting();
+    return true;
   }
 }
 

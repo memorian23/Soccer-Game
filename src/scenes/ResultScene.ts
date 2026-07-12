@@ -2,10 +2,14 @@ import Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { makeButton } from "../ui/button";
 import { createSpeechBubble } from "../ui/speechBubble";
+import { sfx } from "../audio/sfx";
 
 interface ResultData {
   home: number;
   away: number;
+  league?: boolean;
+  homeLabel?: string;
+  awayLabel?: string;
 }
 
 type Outcome = "win" | "lose" | "draw";
@@ -30,6 +34,8 @@ export default class ResultScene extends Phaser.Scene {
   create() {
     const { home, away } = this.matchResult;
     const outcome: Outcome = home > away ? "win" : home < away ? "lose" : "draw";
+    if (outcome === "win") sfx.cheer();
+    else if (outcome === "lose") sfx.boo();
 
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x0b2016).setOrigin(0);
     this.drawStands();
@@ -37,8 +43,10 @@ export default class ResultScene extends Phaser.Scene {
     this.add
       .text(GAME_WIDTH / 2, 36, "경기 종료", { fontFamily: "Arial", fontSize: "22px", color: "#ffffff", fontStyle: "bold" })
       .setOrigin(0.5);
+    const homeLabel = this.matchResult.homeLabel ?? "HOME";
+    const awayLabel = this.matchResult.awayLabel ?? "AWAY";
     this.add
-      .text(GAME_WIDTH / 2, 70, `HOME ${home} : ${away} AWAY`, { fontFamily: "Arial", fontSize: "30px", color: "#ffffff", fontStyle: "bold" })
+      .text(GAME_WIDTH / 2, 70, `${homeLabel} ${home} : ${away} ${awayLabel}`, { fontFamily: "Arial", fontSize: "26px", color: "#ffffff", fontStyle: "bold" })
       .setOrigin(0.5);
 
     const banner = outcome === "win" ? "승리!" : outcome === "lose" ? "패배..." : "무승부";
@@ -50,7 +58,11 @@ export default class ResultScene extends Phaser.Scene {
     const pool = outcome === "win" ? WIN_PHRASES : outcome === "lose" ? LOSE_PHRASES : DRAW_PHRASES;
     this.renderFanBubbles(pool);
 
-    makeButton(this, GAME_WIDTH / 2 - 130, GAME_HEIGHT - 55, "다시 경기", () => this.scene.start("match"), { width: 220 });
+    if (this.matchResult.league) {
+      makeButton(this, GAME_WIDTH / 2 - 130, GAME_HEIGHT - 55, "리그로 돌아가기", () => this.scene.start("league"), { width: 220, fontSize: "15px" });
+    } else {
+      makeButton(this, GAME_WIDTH / 2 - 130, GAME_HEIGHT - 55, "다시 경기", () => this.scene.start("match"), { width: 220 });
+    }
     makeButton(this, GAME_WIDTH / 2 + 130, GAME_HEIGHT - 55, "메뉴로", () => this.scene.start("menu"), { width: 220 });
   }
 

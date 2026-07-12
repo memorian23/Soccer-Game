@@ -1,8 +1,11 @@
 import Phaser from "phaser";
 import Player from "../entities/Player";
 import Ball from "../entities/Ball";
+import { sfx } from "../audio/sfx";
 import { FORMATIONS } from "../data/formations";
+import { CLUB_NAME } from "../data/squad";
 import { teamState } from "../state/teamState";
+import { leagueState } from "../state/leagueState";
 import {
   AI_CHASE_SPEED,
   AI_HOLD_SPEED,
@@ -83,8 +86,21 @@ export default class MatchScene extends Phaser.Scene {
   private matchOver = false;
   private frozen = false;
 
+  private isLeagueMatch = false;
+  private opponentName = "AWAY";
+
   constructor() {
     super("match");
+  }
+
+  init(data: { league?: boolean } = {}) {
+    this.isLeagueMatch = !!data.league;
+    if (this.isLeagueMatch) {
+      const fixture = leagueState.getPlayerFixtureThisRound();
+      this.opponentName = fixture ? leagueState.getOpponentName(fixture) : "AWAY";
+    } else {
+      this.opponentName = "AWAY";
+    }
   }
 
   preload() {
@@ -190,13 +206,14 @@ export default class MatchScene extends Phaser.Scene {
     this.menuKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M);
 
     this.scoreText = this.add
-      .text(GAME_WIDTH / 2, 30, "HOME 0 : 0 AWAY", {
+      .text(GAME_WIDTH / 2, 30, "", {
         fontFamily: "Arial",
         fontSize: "28px",
         color: "#ffffff",
         fontStyle: "bold",
       })
       .setOrigin(0.5);
+    this.updateScoreText();
 
     this.clockText = this.add
       .text(GAME_WIDTH / 2, 60, "0'", {
@@ -223,6 +240,8 @@ export default class MatchScene extends Phaser.Scene {
         color: "#9fd8b0",
       })
       .setDepth(10);
+
+    sfx.whistle();
   }
 
   private drawPitch() {
@@ -449,6 +468,7 @@ export default class MatchScene extends Phaser.Scene {
     (this.ball.body as Phaser.Physics.Arcade.Body).setVelocity(n.x * power, n.y * power);
     this.ballKickedAt = now;
     p.kickCooldownUntil = now + (p.team === "home" ? HUMAN_KICK_COOLDOWN : AI_KICK_COOLDOWN);
+    sfx.kick();
   }
 
   /**
@@ -505,6 +525,7 @@ export default class MatchScene extends Phaser.Scene {
 
   private onGoal(who: string) {
     this.frozen = true;
+    sfx.goal();
     this.messageText.setText(`GOAL! ${who}`);
     this.updateScoreText();
     this.time.delayedCall(1400, () => {
@@ -515,7 +536,9 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   private updateScoreText() {
-    this.scoreText.setText(`HOME ${this.scoreHome} : ${this.scoreAway} AWAY`);
+    const homeLabel = this.isLeagueMatch ? CLUB_NAME : "HOME";
+    const awayLabel = this.isLeagueMatch ? this.opponentName : "AWAY";
+    this.scoreText.setText(`${homeLabel} ${this.scoreHome} : ${this.scoreAway} ${awayLabel}`);
   }
 
   /**
@@ -583,14 +606,24 @@ export default class MatchScene extends Phaser.Scene {
     this.clockText.setText(`${gameMinute}'`);
     if (gameMinute >= MATCH_MINUTES && !this.matchOver) {
       this.matchOver = true;
+      sfx.whistle();
       this.messageText.setText("FULL TIME");
       for (const p of [...this.home, ...this.away]) {
         (p.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
         p.refreshVisual();
       }
       (this.ball.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+      if (this.isLeagueMatch) {
+        leagueState.recordPlayerResult(this.scoreHome, this.scoreAway);
+      }
       this.time.delayedCall(1800, () => {
-        this.scene.start("result", { home: this.scoreHome, away: this.scoreAway });
+        this.scene.start("result", {
+          home: this.scoreHome,
+          away: this.scoreAway,
+          league: this.isLeagueMatch,
+          homeLabel: this.isLeagueMatch ? CLUB_NAME : "HOME",
+          awayLabel: this.isLeagueMatch ? this.opponentName : "AWAY",
+        });
       });
       return;
     }

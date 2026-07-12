@@ -83,3 +83,15 @@ export function roleCounts(slots: FormationSlot[]): Record<Role, number> {
   });
   return counts;
 }
+
+/** The most of each role any single formation preset needs - a safe minimum squad depth. */
+export function maxRoleCounts(): Record<Role, number> {
+  const max: Record<Role, number> = { GK: 0, DF: 0, MF: 0, FW: 0 };
+  (Object.values(FORMATIONS) as FormationDef[]).forEach((def) => {
+    const counts = roleCounts(def.slots);
+    (Object.keys(counts) as Role[]).forEach((role) => {
+      max[role] = Math.max(max[role], counts[role]);
+    });
+  });
+  return max;
+}

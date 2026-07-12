@@ -1,5 +1,8 @@
 import { Role } from "../config";
 
+export const CLUB_NAME = "우리 FC";
+export const STARTING_BUDGET = 300;
+
 export interface PlayerProfile {
   id: string;
   name: string;

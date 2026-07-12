@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { sfx } from "../audio/sfx";
 
 interface ButtonOptions {
   width?: number;
@@ -33,7 +34,10 @@ export function makeButton(scene: Phaser.Scene, x: number, y: number, label: str
   bg.setInteractive({ useHandCursor: true });
   bg.on("pointerover", () => bg.setFillStyle(isActive ? activeColor : bgHover));
   bg.on("pointerout", () => bg.setFillStyle(isActive ? activeColor : bgColor));
-  bg.on("pointerdown", onClick);
+  bg.on("pointerdown", () => {
+    sfx.click();
+    onClick();
+  });
 
   return {
     bg,
