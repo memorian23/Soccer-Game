@@ -67,21 +67,51 @@ export default class MatchScene extends Phaser.Scene {
   }
 
   preload() {
-    this.buildTexture("home", HOME_COLOR, 0xffffff);
-    this.buildTexture("homeGK", HOME_GK_COLOR, 0xffff66);
-    this.buildTexture("away", AWAY_COLOR, 0x333333);
-    this.buildTexture("awayGK", AWAY_GK_COLOR, 0x333333);
+    this.buildPlayerFrames("home", HOME_COLOR, 0xffffff);
+    this.buildPlayerFrames("homeGK", HOME_GK_COLOR, 0xffff66);
+    this.buildPlayerFrames("away", AWAY_COLOR, 0x333333);
+    this.buildPlayerFrames("awayGK", AWAY_GK_COLOR, 0x333333);
     this.buildBallTexture();
   }
 
-  private buildTexture(key: string, fill: number, stroke: number) {
-    const g = this.add.graphics();
-    g.fillStyle(fill, 1);
-    g.lineStyle(2, stroke, 1);
-    g.fillCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
-    g.strokeCircle(PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS);
-    g.generateTexture(key, PLAYER_RADIUS * 2, PLAYER_RADIUS * 2);
-    g.destroy();
+  /** Procedurally draws a 4-frame top-down running cycle (legs swing, body + facing dot) for a team/role. */
+  private buildPlayerFrames(key: string, fill: number, stroke: number) {
+    const fillColor = Phaser.Display.Color.IntegerToColor(fill);
+    const legColor = fillColor.clone().darken(35).color;
+    const luminance = 0.299 * fillColor.red + 0.587 * fillColor.green + 0.114 * fillColor.blue;
+    const noseColor = luminance > 180 ? 0x1a1a1a : 0xffffff;
+    const size = PLAYER_RADIUS * 2 + 10;
+    const c = size / 2;
+    const strideOffsets = [0, 4, 0, -4];
+
+    strideOffsets.forEach((offset, i) => {
+      const g = this.add.graphics();
+
+      // legs (drawn behind the body)
+      g.fillStyle(legColor, 1);
+      g.fillEllipse(c - 3, c + offset, 5, 9);
+      g.fillEllipse(c - 3, c - offset, 5, 9);
+
+      // body
+      g.fillStyle(fill, 1);
+      g.lineStyle(2, stroke, 1);
+      g.fillCircle(c, c, PLAYER_RADIUS);
+      g.strokeCircle(c, c, PLAYER_RADIUS);
+
+      // facing indicator (nose), points along local +x
+      g.fillStyle(noseColor, 0.95);
+      g.fillCircle(c + PLAYER_RADIUS * 0.55, c, 3.2);
+
+      g.generateTexture(`${key}_f${i}`, size, size);
+      g.destroy();
+    });
+
+    this.anims.create({
+      key: `${key}_run`,
+      frames: [0, 1, 2, 3].map((i) => ({ key: `${key}_f${i}` })),
+      frameRate: 9,
+      repeat: -1,
+    });
   }
 
   private buildBallTexture() {
@@ -201,11 +231,11 @@ export default class MatchScene extends Phaser.Scene {
       const ax = PITCH.left + (1 - slot.fx) * (PITCH.right - PITCH.left);
       const ay = PITCH.top + slot.fy * (PITCH.bottom - PITCH.top);
 
-      const homeTex = slot.role === "GK" ? "homeGK" : "home";
-      const awayTex = slot.role === "GK" ? "awayGK" : "away";
+      const homeKey = slot.role === "GK" ? "homeGK" : "home";
+      const awayKey = slot.role === "GK" ? "awayGK" : "away";
 
-      const h = new Player(this, hx, hy, homeTex, "home", slot.role, i, { fx: slot.fx, fy: slot.fy });
-      const a = new Player(this, ax, ay, awayTex, "away", slot.role, i, { fx: 1 - slot.fx, fy: slot.fy });
+      const h = new Player(this, hx, hy, homeKey, "home", slot.role, i, { fx: slot.fx, fy: slot.fy });
+      const a = new Player(this, ax, ay, awayKey, "away", slot.role, i, { fx: 1 - slot.fx, fy: slot.fy });
       h.setDepth(4);
       a.setDepth(4);
       this.home.push(h);
@@ -256,7 +286,7 @@ export default class MatchScene extends Phaser.Scene {
   private holdFormationTarget(p: Player): { x: number; y: number } {
     const slotX = PITCH.left + p.homeSlot.fx * (PITCH.right - PITCH.left);
     const slotY = PITCH.top + p.homeSlot.fy * (PITCH.bottom - PITCH.top);
-    const blend = 0.22;
+    const blend = 0.15;
     const x = Phaser.Math.Linear(slotX, this.ball.x, blend);
     const y = Phaser.Math.Linear(slotY, this.ball.y, blend);
     const target = { x, y };
@@ -370,8 +400,10 @@ export default class MatchScene extends Phaser.Scene {
     if (gameMinute >= MATCH_MINUTES && !this.matchOver) {
       this.matchOver = true;
       this.messageText.setText("FULL TIME");
-      this.home.forEach((p) => (p.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0));
-      this.away.forEach((p) => (p.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0));
+      for (const p of [...this.home, ...this.away]) {
+        (p.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+        p.refreshVisual();
+      }
       (this.ball.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
       return;
     }
@@ -405,19 +437,16 @@ export default class MatchScene extends Phaser.Scene {
     // ---- AI: away nearest player (chase or dribble) ----
     if (awayNearest.player !== carrier || !hasCarrier) {
       this.seek(awayNearest.player, this.ball, AI_CHASE_SPEED);
-      awayNearest.player.setFacingFromVelocity();
     }
 
     // ---- Hold-formation support for everyone else ----
     for (const p of this.home) {
       if (p === controlledPlayer) continue;
       this.seek(p, this.holdFormationTarget(p), AI_HOLD_SPEED);
-      p.setFacingFromVelocity();
     }
     for (const p of this.away) {
       if (p === awayNearest.player) continue;
       this.seek(p, this.holdFormationTarget(p), AI_HOLD_SPEED);
-      p.setFacingFromVelocity();
     }
 
     // ---- Carrier behaviour ----
@@ -462,8 +491,12 @@ export default class MatchScene extends Phaser.Scene {
     this.constrainBall();
     this.handleGoalCheck();
 
+    const ballSpeed = (this.ball.body as Phaser.Physics.Arcade.Body).velocity.length();
+    this.ball.rotation += (ballSpeed / PLAYER_RADIUS) * (delta / 1000);
+
     for (const p of [...this.home, ...this.away]) {
       clampToPitch(p);
+      p.refreshVisual();
     }
 
     // ---- Selection indicator ----
