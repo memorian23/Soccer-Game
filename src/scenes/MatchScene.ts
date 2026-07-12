@@ -6,6 +6,7 @@ import { FORMATIONS } from "../data/formations";
 import { CLUB_NAME } from "../data/squad";
 import { teamState } from "../state/teamState";
 import { leagueState } from "../state/leagueState";
+import MatchRenderer3D from "../render3d/MatchRenderer3D";
 import {
   AI_CHASE_SPEED,
   AI_HOLD_SPEED,
@@ -88,6 +89,10 @@ export default class MatchScene extends Phaser.Scene {
 
   private isLeagueMatch = false;
   private opponentName = "AWAY";
+
+  private renderer3D?: MatchRenderer3D;
+  private controlledPlayerRef: Player | null = null;
+  private hud?: { root: HTMLDivElement; score: HTMLDivElement; clock: HTMLDivElement; message: HTMLDivElement };
 
   constructor() {
     super("match");
@@ -190,6 +195,8 @@ export default class MatchScene extends Phaser.Scene {
     // Lets a flying shot/pass bounce off any player's body (crucial for keeper saves / blocks).
     this.physics.add.collider(this.ball, [...this.home, ...this.away]);
 
+    this.setup3D();
+
     this.controlIndicator = this.add.graphics();
     this.controlIndicator.setDepth(6);
 
@@ -242,6 +249,89 @@ export default class MatchScene extends Phaser.Scene {
       .setDepth(10);
 
     sfx.whistle();
+  }
+
+  /**
+   * Builds the 3D broadcast-view overlay (a separate Three.js canvas layered above Phaser's,
+   * which keeps running the 2D simulation invisibly underneath) and its DOM HUD, then wires up
+   * per-frame sync and cleanup on scene shutdown.
+   */
+  private setup3D() {
+    const host = document.getElementById("app");
+    if (!host) return;
+
+    this.renderer3D = new MatchRenderer3D(host, GAME_WIDTH, GAME_HEIGHT);
+    this.renderer3D.createTeams(this.home, this.away);
+    this.buildHud(host);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown3D());
+
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, () => {
+      if (!this.renderer3D) return;
+      this.renderer3D.sync(this.home, this.away, this.ball, this.controlledPlayerRef);
+      this.renderer3D.render();
+      this.syncHud();
+    });
+  }
+
+  private buildHud(host: HTMLElement) {
+    const root = document.createElement("div");
+    Object.assign(root.style, {
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: `${GAME_WIDTH}px`,
+      height: `${GAME_HEIGHT}px`,
+      zIndex: "10",
+      pointerEvents: "none",
+      fontFamily: "Arial, sans-serif",
+      color: "#ffffff",
+      textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+    });
+
+    const score = document.createElement("div");
+    Object.assign(score.style, { position: "absolute", top: "14px", left: "0", width: "100%", textAlign: "center", fontSize: "28px", fontWeight: "bold" });
+    root.appendChild(score);
+
+    const clock = document.createElement("div");
+    Object.assign(clock.style, { position: "absolute", top: "50px", left: "0", width: "100%", textAlign: "center", fontSize: "15px", color: "#cde9d6" });
+    root.appendChild(clock);
+
+    const message = document.createElement("div");
+    Object.assign(message.style, {
+      position: "absolute",
+      top: "45%",
+      left: "0",
+      width: "100%",
+      textAlign: "center",
+      fontSize: "34px",
+      fontWeight: "bold",
+      color: "#ffe066",
+    });
+    root.appendChild(message);
+
+    const hint = document.createElement("div");
+    Object.assign(hint.style, { position: "absolute", bottom: "8px", left: "10px", fontSize: "13px", color: "#9fd8b0" });
+    hint.textContent = "이동: WASD/방향키   슛: Space   패스: Shift   재시작: R   메뉴: M";
+    root.appendChild(hint);
+
+    host.appendChild(root);
+    this.hud = { root, score, clock, message };
+  }
+
+  /** Mirrors the (now hidden) Phaser HUD text objects into the visible DOM overlay each frame. */
+  private syncHud() {
+    if (!this.hud) return;
+    this.hud.score.textContent = this.scoreText.text;
+    this.hud.clock.textContent = this.clockText.text;
+    this.hud.message.textContent = this.messageText.text;
+  }
+
+  private teardown3D() {
+    this.renderer3D?.dispose();
+    this.renderer3D = undefined;
+    this.hud?.root.remove();
+    this.hud = undefined;
   }
 
   private drawPitch() {
@@ -639,6 +729,7 @@ export default class MatchScene extends Phaser.Scene {
     const homeNearest = this.nearest(this.home, this.ball);
     const awayNearest = this.nearest(this.away, this.ball);
     const controlledPlayer = homeNearest.player;
+    this.controlledPlayerRef = controlledPlayer;
 
     const globalCarrierIsHome = homeNearest.d <= awayNearest.d;
     const carrierDist = globalCarrierIsHome ? homeNearest.d : awayNearest.d;
