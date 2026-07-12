@@ -384,7 +384,7 @@ export default class MatchScene extends Phaser.Scene {
 
   private createTeams() {
     // Home uses whatever formation/lineup was chosen on the tactics & squad screens; away
-    // always fields the default 4-4-2 opponent.
+    // always fields the default 2-2-1 opponent.
     const lineup = teamState.getLineup();
     this.homeSlots = lineup.map((entry) => entry.slot);
     lineup.forEach(({ slot, player }, i) => {
@@ -396,7 +396,7 @@ export default class MatchScene extends Phaser.Scene {
       this.home.push(h);
     });
 
-    this.awaySlots = FORMATIONS["442"].slots;
+    this.awaySlots = FORMATIONS["221"].slots;
     this.awaySlots.forEach((slot, i) => {
       const ax = PITCH.left + (1 - slot.fx) * (PITCH.right - PITCH.left);
       const ay = PITCH.top + slot.fy * (PITCH.bottom - PITCH.top);

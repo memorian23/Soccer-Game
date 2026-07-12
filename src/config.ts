@@ -27,19 +27,14 @@ export interface FormationSlot {
   fy: number; // 0 = top touchline, 1 = bottom touchline
 }
 
-// Home team defends the LEFT goal, attacks the RIGHT goal. 4-4-2 formation.
+// Home team defends the LEFT goal, attacks the RIGHT goal. 6-a-side, 2-2-1 formation.
 export const FORMATION: FormationSlot[] = [
   { role: "GK", fx: 0.05, fy: 0.5 },
-  { role: "DF", fx: 0.18, fy: 0.14 },
-  { role: "DF", fx: 0.15, fy: 0.37 },
-  { role: "DF", fx: 0.15, fy: 0.63 },
-  { role: "DF", fx: 0.18, fy: 0.86 },
-  { role: "MF", fx: 0.45, fy: 0.14 },
-  { role: "MF", fx: 0.42, fy: 0.4 },
-  { role: "MF", fx: 0.42, fy: 0.6 },
-  { role: "MF", fx: 0.45, fy: 0.86 },
-  { role: "FW", fx: 0.74, fy: 0.38 },
-  { role: "FW", fx: 0.74, fy: 0.62 },
+  { role: "DF", fx: 0.22, fy: 0.28 },
+  { role: "DF", fx: 0.22, fy: 0.72 },
+  { role: "MF", fx: 0.52, fy: 0.32 },
+  { role: "MF", fx: 0.52, fy: 0.68 },
+  { role: "FW", fx: 0.78, fy: 0.5 },
 ];
 
 export const PLAYER_RADIUS = 13;

@@ -18,7 +18,7 @@ function groupByRole(players: PlayerProfile[]): Record<Role, PlayerProfile[]> {
  */
 class TeamState {
   squad: PlayerProfile[] = DEFAULT_SQUAD;
-  private formationId: FormationId = "442";
+  private formationId: FormationId = "221";
   private startingIds: string[] = [];
   private budget = STARTING_BUDGET;
   private signedMarketIds = new Set<string>();
