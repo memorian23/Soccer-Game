@@ -12,6 +12,7 @@ import {
   AI_HOLD_SPEED,
   AI_KICK_COOLDOWN,
   AWAY_CHASE_SPEED_MULT,
+  AWAY_DRIBBLE_SPEED_MULT,
   AWAY_PRESS_STRENGTH,
   AWAY_SHOT_POWER_MULT,
   AWAY_SHOT_SPREAD,
@@ -535,7 +536,8 @@ export default class MatchScene extends Phaser.Scene {
 
     others.forEach((p, idx) => {
       if (p.role === "GK") {
-        this.seek(p, this.goalkeeperTarget(p), AI_HOLD_SPEED);
+        // Floor it so a weak opponent's keeper is sluggish, not frozen in place.
+        this.seek(p, this.goalkeeperTarget(p), AI_HOLD_SPEED * Math.max(pressStrength, 0.55));
         return;
       }
       if (opponentHasBall && dangerZone && idx === 0) {
@@ -587,7 +589,8 @@ export default class MatchScene extends Phaser.Scene {
     // magnitude instead of length 1, and glueBallTo's offset (facing * ~24px) explodes into
     // hundreds of pixels, flinging the ball across the pitch.
     carrier.facing.set(dribbleDir.x, dribbleDir.y);
-    const v = dribbleDir.scale(AI_CHASE_SPEED * 0.92 * jockeyScale);
+    const dribbleSpeedMult = carrier.team === "away" ? AWAY_DRIBBLE_SPEED_MULT : 1;
+    const v = dribbleDir.scale(AI_CHASE_SPEED * 0.92 * jockeyScale * dribbleSpeedMult);
     (carrier.body as Phaser.Physics.Arcade.Body).setVelocity(v.x, v.y);
     this.glueBallTo(carrier);
 

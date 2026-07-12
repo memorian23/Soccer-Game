@@ -92,10 +92,11 @@ export const GK_MAX_ADVANCE = 90; // furthest the keeper will rush out to close 
 export const GK_RUSH_DISTANCE = 150; // ball-to-goal distance at which the keeper starts rushing out
 
 // ---- Opponent difficulty ----
-// The AI opponent (away) was winning the ball back and finishing too reliably against a human
-// player. These only soften the away team specifically - the human's own AI teammates (home)
-// keep their full defensive/attacking strength so they're still useful support.
-export const AWAY_PRESS_STRENGTH = 0.7; // multiplies away's press-blend and cover-chase-speed
-export const AWAY_CHASE_SPEED_MULT = 0.88; // away's speed when closing down a loose ball
-export const AWAY_SHOT_SPREAD = 0.4; // radians of random aim error on an away shot (was ~0.22)
-export const AWAY_SHOT_POWER_MULT = 0.8; // away's shot power as a fraction of SHOOT_POWER
+// The AI opponent (away) should be an easy, forgiving opponent for a human player. These only
+// soften the away team specifically - the human's own AI teammates (home) keep their full
+// defensive/attacking strength so they're still useful support.
+export const AWAY_PRESS_STRENGTH = 0.3; // multiplies away's press-blend, cover-chase-speed, and GK reaction speed
+export const AWAY_CHASE_SPEED_MULT = 0.6; // away's speed when closing down a loose ball
+export const AWAY_DRIBBLE_SPEED_MULT = 0.7; // away carrier's dribbling speed toward goal
+export const AWAY_SHOT_SPREAD = 0.8; // radians of random aim error on an away shot (was ~0.22) - most shots miss the frame
+export const AWAY_SHOT_POWER_MULT = 0.55; // away's shot power as a fraction of SHOOT_POWER
