@@ -589,6 +589,9 @@ export default class MatchScene extends Phaser.Scene {
         p.refreshVisual();
       }
       (this.ball.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+      this.time.delayedCall(1800, () => {
+        this.scene.start("result", { home: this.scoreHome, away: this.scoreAway });
+      });
       return;
     }
 
