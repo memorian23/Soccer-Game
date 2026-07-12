@@ -49,7 +49,12 @@ export const PLAYER_SPEED = 205;
 export const AI_CHASE_SPEED = 195;
 export const AI_HOLD_SPEED = 150;
 
-export const POSSESS_RADIUS = 20;
+// Must comfortably exceed glueBallTo's dribble offset (~24px, since a held ball sits out in
+// front of the carrier rather than on top of them) - otherwise the carrier's own steady-state
+// distance to the ball exceeds this radius and "who has the ball" flickers to nobody every
+// other frame, which breaks both the AI's goal-directed dribbling AND a defender's ability to
+// ever legitimately close the gap and dispossess them.
+export const POSSESS_RADIUS = 30;
 export const KICK_RADIUS = 24;
 export const SHOOT_POWER = 620;
 export const PASS_POWER = 420;
@@ -79,9 +84,12 @@ export const COVER_CHASE_SPEED_FACTOR = 0.95;
 export const JOCKEY_RADIUS = 30;
 export const JOCKEY_SLOW_FACTOR = 0.55;
 // The covering defender holds this far off the ball on the goal side rather than running
-// straight onto it - close enough to jockey/tackle, far enough that a shot can still be
-// struck instead of colliding with the marker's body at point-blank range every time.
-export const MARK_DISTANCE = 24;
+// straight onto it - far enough that a shot can still be struck instead of colliding with the
+// marker's body at point-blank range every time, but meaningfully closer than the carrier's
+// own ~24px hold distance so the defender can actually out-distance the attacker and trigger
+// a real tackle (whoever is nearest the ball becomes the new carrier) instead of just shadowing
+// forever.
+export const MARK_DISTANCE = 15;
 
 // Goalkeeper positioning.
 export const GK_LINE_OFFSET = 16; // stands this far off the goal line by default

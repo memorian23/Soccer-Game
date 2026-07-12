@@ -507,7 +507,7 @@ export default class MatchScene extends Phaser.Scene {
       return;
     }
 
-    if (Phaser.Math.Between(0, 1000) < 6) {
+    if (Phaser.Math.Between(0, 1000) < 30) {
       const own = carrier.team === "home" ? this.home : this.away;
       const teammates = own.filter((p) => p !== carrier && (attackingRight ? p.x > carrier.x - 40 : p.x < carrier.x + 40));
       if (teammates.length > 0) {
