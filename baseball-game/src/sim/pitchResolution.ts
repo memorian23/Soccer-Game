@@ -1,11 +1,6 @@
 import { GameState } from "../state/gameState";
 import { PitchType } from "../data/pitchTypes";
-
-/** Normalized aim point: 0,0 is the center of the true strike zone; ±1 is the zone edge. */
-export interface AimPoint {
-  x: number;
-  y: number;
-}
+import { AimPoint, CHASE_MARGIN, computePitchLocation, ZONE_HALF } from "./pitchPhysics";
 
 export type ThrowOutcome = "ball" | "strike" | "foul" | "out" | "single" | "double" | "triple" | "homerun";
 
@@ -17,21 +12,16 @@ export interface ThrowResult {
   swung: boolean;
 }
 
-const ZONE_HALF = 1;
-const CHASE_MARGIN = 0.6;
-
-/** Resolves one pitch against the current batter and applies the result to GameState. */
+/**
+ * Resolves one pitch when the user is pitching: the batter is AI-controlled and decides
+ * whether to swing based on the pitch's actual location relative to the strike zone.
+ */
 export function throwPitch(state: GameState, pitchType: PitchType, aim: AimPoint): ThrowResult {
   const batter = state.currentBatter;
   const pitcher = state.currentPitcher;
 
-  const controlFactor = (pitcher.control / 99) * pitchType.controlMultiplier;
-  const deviation = (1 - controlFactor) * 0.9;
-  const actualX = aim.x + pitchType.breakX + (Math.random() * 2 - 1) * deviation;
-  const actualY = aim.y + pitchType.breakY + (Math.random() * 2 - 1) * deviation;
-
+  const { actualX, actualY, inZone, edgePenalty } = computePitchLocation(pitcher, pitchType, aim);
   const dist = Math.max(Math.abs(actualX), Math.abs(actualY));
-  const inZone = dist <= ZONE_HALF;
 
   let swingChance: number;
   if (inZone) {
@@ -53,7 +43,6 @@ export function throwPitch(state: GameState, pitchType: PitchType, aim: AimPoint
     return { outcome: "ball", actualX, actualY, inZone, swung };
   }
 
-  const edgePenalty = dist > ZONE_HALF ? (dist - ZONE_HALF) * 40 : 0;
   const contactRoll = Math.random() * 100 + batter.contact - pitchType.difficulty - edgePenalty;
 
   if (contactRoll < 35) {

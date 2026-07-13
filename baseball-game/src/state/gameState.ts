@@ -65,6 +65,8 @@ export class GameState {
     this.balls++;
     if (this.balls >= MAX_BALLS) {
       this.walk();
+    } else {
+      this.lastPlay = "볼";
     }
   }
 

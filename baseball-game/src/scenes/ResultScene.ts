@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { GAME_WIDTH } from "../config";
 import { GameState } from "../state/gameState";
+import { sound } from "../audio/sound";
 
 export class ResultScene extends Phaser.Scene {
   constructor() {
@@ -48,6 +49,9 @@ export class ResultScene extends Phaser.Scene {
 
     button.on("pointerover", () => button.setFillStyle(0x38ab5d));
     button.on("pointerout", () => button.setFillStyle(0x2f8f4e));
-    button.on("pointerdown", () => this.scene.start("MenuScene"));
+    button.on("pointerdown", () => {
+      sound.buttonClick();
+      this.scene.start("MenuScene");
+    });
   }
 }
