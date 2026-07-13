@@ -115,6 +115,22 @@ export class GameState {
     }
   }
 
+  /** A pickoff catches a runner off base. The batter's own count/at-bat is untouched. */
+  pickoffOut(baseIdx: 0 | 1 | 2) {
+    if (this.gameOver || !this.bases[baseIdx]) return;
+    const newBases = [...this.bases] as [boolean, boolean, boolean];
+    newBases[baseIdx] = false;
+    this.bases = newBases;
+
+    const label = ["1루", "2루", "3루"][baseIdx];
+    this.lastPlay = `견제사! ${label} 주자 아웃`;
+
+    this.outs++;
+    if (this.outs >= MAX_OUTS) {
+      this.advanceHalfInning();
+    }
+  }
+
   hit(basesAdvanced: 1 | 2 | 3 | 4) {
     if (this.gameOver) return;
     const batter = this.currentBatter;
