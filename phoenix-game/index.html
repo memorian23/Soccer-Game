@@ -97,6 +97,11 @@
   #ultBtn.ready { animation: pulse 0.8s infinite alternate; }
   @keyframes pulse { from { box-shadow: 0 0 8px #ff8a2a; } to { box-shadow: 0 0 28px #ffd04a; } }
 
+  #exploreTop { position: fixed; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; z-index: 3; }
+  #exploreTop .sp { margin-left: auto; }
+  #exploreBottom { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; width: min(620px, calc(100% - 20px)); z-index: 3; text-align: center; }
+  #xMsg { padding: 9px 14px; font-size: 14px; line-height: 1.5; }
+  #xBtns { margin-top: 8px; }
   .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5, 2, 8, .6); z-index: 10; }
   .overlay .card { max-width: 520px; width: calc(100% - 28px); text-align: center; padding: 20px 18px 16px; max-height: calc(100% - 28px); overflow: auto; background: var(--sheet); border: 1px solid var(--line); border-radius: 16px; }
   .overlay h2 { margin: 0 0 10px; font-size: 21px; color: var(--accent); }
@@ -139,7 +144,7 @@
   <div class="chip">🔥 <b id="coins">0</b> 불씨</div>
   <div class="chip">🏆 스테이지 <b id="bestStage">1</b></div>
   <div class="chip">🐦 보관 <b id="owned">0</b> · ⚔️ 출전 <b id="partyN">0</b></div>
-  <div class="chip">📖 <b id="dexN">0</b>/100</div>
+  <div class="chip">📖 <b id="dexN">0</b></div>
   <button id="mute">🔊</button>
 </div>
 
@@ -165,6 +170,7 @@
   <button data-tab="storage"><span>📦</span>보관함</button>
   <button data-tab="fusion"><span>🧬</span>합성</button>
   <button data-tab="hatch"><span>🥚</span>부화</button>
+  <button data-tab="explore"><span>🧭</span>탐험</button>
   <button data-tab="battle"><span>⚔️</span>전투</button>
   <button data-tab="dex"><span>📖</span>도감</button>
 </nav>
@@ -188,15 +194,27 @@
   <button id="ultBtn" disabled><div id="ultFill"></div><span>🔥 피닉스 폭풍</span></button>
 </div>
 
+<div id="exploreTop" class="hidden">
+  <div class="chip" id="xRegion"></div>
+  <div class="chip" id="xStam"></div>
+  <div class="chip" id="xCoins"></div>
+  <button id="xBack" class="sp">🏠 돌아가기</button>
+</div>
+<div id="exploreBottom" class="hidden">
+  <div id="xMsg" class="panel"></div>
+  <div id="xBtns" class="row"></div>
+</div>
+
 <div id="title" class="overlay">
   <div class="card">
     <h1>불사조 길들이기</h1>
-    <p>새끼 → 청년 → 어른으로 키우고, 100가지 빛깔의 불사조를 모아 AI와 겨루세요.</p>
+    <p>새끼 → 청년 → 어른으로 키우고, 200가지 빛깔의 불사조를 모으고 탐험하며 AI와 겨루세요.</p>
     <ul>
       <li><b>둥지</b>: 대표 불사조를 쓰다듬고 먹이고 교감해 길들이기</li>
       <li><b>진화</b>: 레벨 10에 청년, 25에 어른으로 진화</li>
       <li><b>합성</b>: 두 불사조를 섞어 새로운 색과 높은 희귀도 노리기</li>
-      <li><b>부화</b>: 알을 부화해 100가지 색 중 하나 얻기</li>
+      <li><b>부화</b>: 알을 부화해 200가지 색 중 하나 얻기</li>
+      <li><b>탐험</b>: 다섯 지역을 돌아다니며 야생 불사조를 만나 포획하기</li>
       <li><b>전투</b>: 출전 수 제한 없이 팀을 꾸려 AI와 자동 전투, 승리하면 야생 불사조 포획</li>
       <li>보관함도 무제한입니다.</li>
     </ul>

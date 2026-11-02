@@ -48,7 +48,7 @@ function toCanvas(img, s) {
 }
 
 // ============================================================
-// 100 colours
+// 200 colours: 20 hues x 10 tones, 10 of them replaced by mythic phoenixes
 // ============================================================
 const HUE_NAMES = ['진홍', '주홍', '호박', '황금', '레몬', '연두', '풀잎', '비취', '에메랄드', '옥빛',
   '청록', '하늘', '창공', '사파이어', '남색', '보라', '자수정', '자홍', '장미', '루비'];
@@ -58,8 +58,16 @@ const TONES = [
   { p: '그림자 ', s: 1.15, b: 0.7, r: 1 },
   { p: '파스텔 ', s: 0.45, b: 1.15, r: 2 },
   { p: '네온 ', s: 1.65, b: 1.08, r: 3 },
+  { p: '얼음 ', s: 0.6, b: 1.1, r: 1, fx: 'frost' },
+  { p: '용암 ', s: 1.35, b: 1.05, r: 2, fx: 'lava' },
+  { p: '쌍색 ', s: 1.15, b: 1.02, r: 2, fx: 'dual' },
+  { p: '유령 ', s: 0.55, b: 1.15, r: 3, fx: 'ghost' },
+  { p: '황금테 ', s: 1.1, b: 0.95, r: 3, fx: 'gild' },
 ];
-const MYTHIC = { 80: ['흑염', 'black'], 84: ['백염', 'white'], 88: ['무지개', 'rainbow'], 92: ['은하', 'galaxy'], 96: ['황혼', 'dusk'] };
+const MYTHIC = {
+  80: ['흑염', 'black'], 84: ['백염', 'white'], 88: ['무지개', 'rainbow'], 92: ['은하', 'galaxy'], 96: ['황혼', 'dusk'],
+  180: ['태초', 'primal'], 184: ['심연', 'abyss'], 188: ['오로라', 'aurora'], 192: ['성운', 'nebula'], 196: ['불멸', 'immortal'],
+};
 const RARITY = ['일반', '희귀', '영웅', '전설', '신화'];
 const RARITY_COL = ['#bdbdbd', '#5ab0ff', '#c77dff', '#ffb347', '#ff5a7a'];
 const ELEM = {
@@ -96,18 +104,24 @@ function applyM(M, r, g, b) {
   return [clamp(M[0] * r + M[1] * g + M[2] * b, 0, 255), clamp(M[3] * r + M[4] * g + M[5] * b, 0, 255), clamp(M[6] * r + M[7] * g + M[8] * b, 0, 255)];
 }
 
+const MYTHIC_POST = { abyss: 'abyss', immortal: 'gild', aurora: 'aurora' };
+const STARS = { galaxy: [255, 255, 255], black: [255, 90, 40], nebula: [255, 240, 255], abyss: [120, 255, 255], frost: [235, 250, 255] };
 const COLORS = [];
-for (let t = 0; t < 5; t++) {
+for (let t = 0; t < TONES.length; t++) {
   for (let h = 0; h < 20; h++) {
     const id = t * 20 + h, hue = h * 18;
     if (MYTHIC[id]) {
-      COLORS.push({ id, name: MYTHIC[id][0] + ' 불사조', short: MYTHIC[id][0], rar: 4, elem: 'holy', kind: MYTHIC[id][1], hIdx: -1 });
+      const kind = MYTHIC[id][1];
+      COLORS.push({ id, name: MYTHIC[id][0] + ' 불사조', short: MYTHIC[id][0], rar: 4, elem: 'holy', kind, post: MYTHIC_POST[kind] || null, stars: STARS[kind] || null, hIdx: -1 });
     } else {
       const T0 = TONES[t];
-      COLORS.push({ id, name: T0.p + HUE_NAMES[h] + ' 불사조', short: T0.p + HUE_NAMES[h], rar: T0.r, elem: hueElem(hue), kind: 'mat', hue, s: T0.s, b: T0.b, hIdx: h, tone: t });
+      COLORS.push({ id, name: T0.p + HUE_NAMES[h] + ' 불사조', short: T0.p + HUE_NAMES[h], rar: T0.r, elem: hueElem(hue), kind: T0.fx === 'dual' ? 'dual' : 'mat',
+        post: T0.fx && T0.fx !== 'dual' ? T0.fx : null, stars: T0.fx === 'frost' ? STARS.frost : null, hue, s: T0.s, b: T0.b, hIdx: h, tone: t });
     }
   }
 }
+const PER_COL = new Set(['rainbow', 'aurora']);
+const PER_ROW = new Set(['galaxy', 'dusk', 'primal', 'nebula', 'dual']);
 function colorMatrix(C, fx, fy) {
   switch (C.kind) {
     case 'black': return mFor(BASE_HUE, 0.25, 0.42);
@@ -115,12 +129,18 @@ function colorMatrix(C, fx, fy) {
     case 'rainbow': return mFor(fx * 360, 1.35, 1.05);
     case 'galaxy': return mFor(235 + fy * 50, 1.25, 0.72);
     case 'dusk': return mFor(285 + fy * 105, 1.25, 1.0);
+    case 'primal': return mFor(fy * 55, 1.55, 1.05);
+    case 'abyss': return mFor(225, 1.2, 0.75);
+    case 'aurora': return mFor(110 + fx * 190, 1.35, 1.12);
+    case 'nebula': return mFor(310 - fy * 130, 1.3, 0.85);
+    case 'immortal': return mFor(BASE_HUE, 0.12, 1.22);
+    case 'dual': return mFor(C.hue + fy * 170, C.s, C.b);
     default: return mFor(C.hue, C.s, C.b);
   }
 }
 for (const C of COLORS) {
   const [r, g, b] = applyM(colorMatrix(C, 0.5, 0.5), 255, 150, 50);
-  C.glow = `${Math.round(r)},${Math.round(g)},${Math.round(b)}`;
+  C.glow = C.kind === 'abyss' ? '120,240,255' : C.kind === 'immortal' ? '255,220,130' : `${Math.round(r)},${Math.round(g)},${Math.round(b)}`;
 }
 
 function colorize(src, C) {
@@ -130,9 +150,10 @@ function colorize(src, C) {
   const g = c.getContext('2d', { willReadFrequently: true });
   g.drawImage(src, 0, 0);
   const d = g.getImageData(0, 0, w, h), p = d.data;
-  const perCol = C.kind === 'rainbow', perRow = C.kind === 'galaxy' || C.kind === 'dusk';
+  const perCol = PER_COL.has(C.kind), perRow = PER_ROW.has(C.kind);
   const fixed = !perCol && !perRow ? colorMatrix(C, 0.5, 0.5) : null;
   const cols = perCol ? Array.from({ length: w }, (_, x) => colorMatrix(C, x / w, 0.5)) : null;
+  const post = C.post;
   for (let y = 0; y < h; y++) {
     const rowM = perRow ? colorMatrix(C, 0.5, y / h) : null;
     for (let x = 0; x < w; x++) {
@@ -140,19 +161,37 @@ function colorize(src, C) {
       if (p[i + 3] === 0) continue;
       const M = fixed || rowM || cols[x];
       const r = p[i], gg = p[i + 1], b = p[i + 2];
-      p[i] = M[0] * r + M[1] * gg + M[2] * b;
-      p[i + 1] = M[3] * r + M[4] * gg + M[5] * b;
-      p[i + 2] = M[6] * r + M[7] * gg + M[8] * b;
+      let r2 = M[0] * r + M[1] * gg + M[2] * b;
+      let g2 = M[3] * r + M[4] * gg + M[5] * b;
+      let b2 = M[6] * r + M[7] * gg + M[8] * b;
+      if (post) {
+        const l = (0.299 * r + 0.587 * gg + 0.114 * b) / 255;
+        if (post === 'frost') {
+          const k = 0.45 * l;
+          r2 = lerp(r2, 215, k); g2 = lerp(g2, 240, k); b2 = lerp(b2, 255, k);
+        } else if (post === 'lava' || post === 'abyss') {
+          const f = 0.22 + 1.55 * Math.pow(l, 2.3);
+          r2 *= f; g2 *= f; b2 *= f;
+          if (post === 'abyss' && l > 0.65) { const k = Math.min(1, (l - 0.65) / 0.3); r2 = lerp(r2, 110, k); g2 = lerp(g2, 250, k); b2 = lerp(b2, 255, k); }
+        } else if (post === 'ghost') {
+          p[i + 3] *= 0.45 + 0.4 * l;
+          r2 = lerp(r2, 230, 0.15); g2 = lerp(g2, 240, 0.15); b2 = lerp(b2, 255, 0.15);
+        } else if (post === 'aurora') {
+          p[i + 3] *= 0.88;
+        } else if (post === 'gild') {
+          if (l > 0.5) { const k = Math.min(1, (l - 0.5) / 0.4) * 0.85; r2 = lerp(r2, 255, k); g2 = lerp(g2, 212, k); b2 = lerp(b2, 90, k); }
+        }
+      }
+      p[i] = r2; p[i + 1] = g2; p[i + 2] = b2;
     }
   }
-  if (C.kind === 'galaxy' || C.kind === 'black') {
+  if (C.stars) {
     const R = rng(C.id + w);
-    const n = Math.floor((w * h) / (C.kind === 'galaxy' ? 260 : 700));
+    const n = Math.floor((w * h) / (C.kind === 'galaxy' || C.kind === 'nebula' ? 260 : 700));
     for (let k = 0; k < n; k++) {
       const x = Math.floor(R() * w), y = Math.floor(R() * h), i = (y * w + x) * 4;
       if (p[i + 3] < 200) continue;
-      const v = C.kind === 'galaxy' ? [255, 255, 255] : [255, 90, 40];
-      p[i] = v[0]; p[i + 1] = v[1]; p[i + 2] = v[2];
+      p[i] = C.stars[0]; p[i + 1] = C.stars[1]; p[i + 2] = C.stars[2];
     }
   }
   g.putImageData(d, 0, 0);
@@ -162,6 +201,7 @@ function colorize(src, C) {
   out.getContext('2d').drawImage(c, 0, 0);
   return out;
 }
+const NCOL = COLORS.length;
 const CCACHE = new Map();
 function colored(cid, st, thumb) {
   const key = cid + '|' + st + '|' + (thumb ? 't' : 'f');
@@ -208,7 +248,7 @@ const stars = (n) => (n ? '<span class="stars">' + '★'.repeat(n) + '</span>' :
 const SAVE_KEY = 'phoenix-taming-v2';
 let G = null;
 function newGame() {
-  G = { v: 2, coins: 300, ph: [], rep: 0, nextUid: 1, stage: 1, best: 1, dex: Array(100).fill(0), speed: 1, tactic: 'adv', autoNext: false, muted: false, created: Date.now() };
+  G = { v: 2, coins: 300, ph: [], rep: 0, nextUid: 1, stage: 1, best: 1, dex: Array(NCOL).fill(0), speed: 1, tactic: 'adv', autoNext: false, muted: false, created: Date.now() };
   const p = addPhoenix({ c: STARTER_COLOR, st: 0, lv: 1 });
   p.party = true;
   G.rep = p.uid;
@@ -288,6 +328,7 @@ const SFX = {
   splash() { tone(400, 0.25, 'sine', 0.08, -300); },
   hit() { tone(180 + Math.random() * 60, 0.07, 'square', 0.03, -60); },
   fire() { tone(500, 0.12, 'sawtooth', 0.025, -300); },
+  breath() { tone(260, 0.35, 'sawtooth', 0.03, -180); tone(140, 0.4, 'square', 0.015, -60); },
   heal() { tone(700, 0.2, 'sine', 0.05, 300); },
   evolve() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.35, 'triangle', 0.08, 0, i * 0.14)); },
   win() { [659, 784, 988, 1319].forEach((f, i) => tone(f, 0.3, 'triangle', 0.08, 0, i * 0.12)); },
@@ -420,7 +461,7 @@ function updateTop() {
   $('bestStage').textContent = G.best;
   $('owned').textContent = G.ph.length;
   $('partyN').textContent = party().length;
-  $('dexN').textContent = G.dex.reduce((a, b) => a + b, 0);
+  $('dexN').textContent = G.dex.reduce((a, b) => a + b, 0) + ' / ' + NCOL;
   $('mute').textContent = G.muted ? '🔇' : '🔊';
   const p = rep();
   if (!p) return;
@@ -845,7 +886,10 @@ function drawCatch() {
 function syncUI() {
   const inGame = mode !== 'title';
   const inBattle = mode === 'battle';
-  const mini = mode === 'rhythm' || mode === 'catch';
+  const inExplore = mode === 'explore';
+  const mini = mode === 'rhythm' || mode === 'catch' || inExplore;
+  $('exploreTop').classList.toggle('hidden', !inExplore);
+  $('exploreBottom').classList.toggle('hidden', !inExplore);
   $('topbar').classList.toggle('hidden', !inGame || inBattle || mini);
   $('nav').classList.toggle('hidden', !inGame || inBattle || mini);
   $('repCard').classList.toggle('hidden', !inGame || inBattle || mini || tab !== 'home');
@@ -862,7 +906,7 @@ function goTab(t) {
   syncUI();
 }
 function renderSheet() {
-  ({ storage: renderStorage, fusion: renderFusion, hatch: renderHatch, battle: renderBattlePrep, dex: renderDex })[tab]();
+  ({ storage: renderStorage, fusion: renderFusion, hatch: renderHatch, explore: renderExplore, battle: renderBattlePrep, dex: renderDex })[tab]();
 }
 function tool(label, fn, cls) {
   const b = document.createElement('button');
@@ -1057,9 +1101,9 @@ function renderHatch() {
   $('sheetTitle').textContent = '🥚 부화';
   $('sheetBody').innerHTML = `<div class="center">
     <canvas id="eggCv" width="220" height="220" style="width:180px;height:180px;position:static;margin:0 auto"></canvas>
-    <p class="hint">불사조의 알을 부화하면 100가지 색 중 하나가 새끼 불사조로 태어나요.</p>
+    <p class="hint">불사조의 알을 부화하면 200가지 색 중 하나가 새끼 불사조로 태어나요.</p>
     <div class="row"><button id="egg1" class="primary">알 1개 부화 (100🔥)</button><button id="egg10" class="primary">10연 부화 (900🔥)</button></div>
-    <p class="odds" style="margin-top:12px">${RARITY.map((r, i) => `<span style="color:${RARITY_COL[i]}">${r} ${EGG_W[i]}%</span>`).join(' · ')}<br>신화(흑염·백염·무지개·은하·황혼)는 부화, 합성 승급, 보스 포획으로 얻을 수 있어요.</p>
+    <p class="odds" style="margin-top:12px">${RARITY.map((r, i) => `<span style="color:${RARITY_COL[i]}">${r} ${EGG_W[i]}%</span>`).join(' · ')}<br>신화 10종(흑염·백염·무지개·은하·황혼·태초·심연·오로라·성운·불멸)은 부화, 합성 승급, 보스 포획, 천공의 성역 탐험으로 얻을 수 있어요.</p>
   </div>`;
   $('egg1').disabled = G.coins < 100;
   $('egg10').disabled = G.coins < 900;
@@ -1118,8 +1162,8 @@ function hatch(n, cost) {
 function renderDex() {
   $('sheetTools').innerHTML = '';
   const n = G.dex.reduce((a, b) => a + b, 0);
-  $('sheetTitle').textContent = `📖 도감 ${n} / 100`;
-  $('sheetBody').innerHTML = `<p class="hint">100가지 색의 불사조. 발견한 색은 밝게 표시돼요. 도감 10종마다 보상을 받을 수 있어요.</p>
+  $('sheetTitle').textContent = `📖 도감 ${n} / ${NCOL}`;
+  $('sheetBody').innerHTML = `<p class="hint">200가지 색의 불사조. 발견한 색은 밝게 표시돼요. 도감 10종마다 보상을 받을 수 있어요.</p>
     <div class="grid">${COLORS.map((C) => {
       const known = G.dex[C.id];
       return `<div class="card-ph ${known ? '' : 'unknown'}" style="border-color:${known ? RARITY_COL[C.rar] : '#333'};cursor:default">
@@ -1168,6 +1212,294 @@ function renderBattlePrep() {
   $('autoNext').onchange = (e) => { G.autoNext = e.target.checked; save(); };
   $('goBattle').onclick = () => startBattle(N);
   for (const el of $('sheetBody').querySelectorAll('.card-ph')) el.onclick = () => showDetail(byUid(+el.dataset.uid));
+}
+
+// ============================================================
+// exploration — roam regions, meet wild phoenixes and capture them
+// ============================================================
+const REGIONS = [
+  { name: '잿빛 협곡', icon: '🌋', elem: 'fire', lv: [1, 8], unlock: 1, rb: 0, tint: 'rgba(255,90,30,0.10)', desc: '🔥화 속성 불사조가 자주 나타나는 협곡' },
+  { name: '비취 숲', icon: '🌲', elem: 'wind', lv: [5, 15], unlock: 3, rb: 0.05, tint: 'rgba(30,150,70,0.30)', desc: '🍃풍 속성 불사조가 둥지를 튼 숲' },
+  { name: '푸른 폭포', icon: '💧', elem: 'water', lv: [10, 22], unlock: 8, rb: 0.1, tint: 'rgba(30,100,210,0.30)', desc: '💧수 속성 불사조가 모이는 폭포' },
+  { name: '자수정 동굴', icon: '🔮', elem: 'spirit', lv: [18, 32], unlock: 15, rb: 0.2, tint: 'rgba(110,30,170,0.38)', desc: '🔮영 속성 불사조가 잠든 동굴' },
+  { name: '천공의 성역', icon: '✨', elem: null, lv: [28, 45], unlock: 25, rb: 0.45, tint: 'rgba(255,240,200,0.16)', desc: '희귀·전설·신화 불사조가 깃드는 하늘의 땅' },
+];
+const STAM_MAX = 20, STAM_SEC = 45;
+function stam() {
+  const now = Date.now();
+  if (G.stam === undefined) { G.stam = STAM_MAX; G.stamT = now; }
+  if (G.stam >= STAM_MAX) { G.stamT = now; return G.stam; }
+  const gained = Math.floor((now - G.stamT) / 1000 / STAM_SEC);
+  if (gained > 0) {
+    G.stam = Math.min(STAM_MAX, G.stam + gained);
+    G.stamT += gained * STAM_SEC * 1000;
+    if (G.stam >= STAM_MAX) G.stamT = now;
+  }
+  return G.stam;
+}
+function renderExplore() {
+  $('sheetTools').innerHTML = '';
+  $('sheetTitle').textContent = '🧭 탐험';
+  const st0 = stam();
+  const next = st0 >= STAM_MAX ? '가득 참' : `${Math.ceil(STAM_SEC - ((Date.now() - G.stamT) / 1000) % STAM_SEC)}초 후 +1`;
+  $('sheetBody').innerHTML = `<p class="hint">지역을 골라 탐색하면 야생 불사조를 만날 수 있어요. 고리 타이밍을 맞춰 길들이면 포획!<br>
+    탐험 기력 ⚡ <b>${st0} / ${STAM_MAX}</b> (${next}) · 탐색 1회에 ⚡1</p>
+    <div class="row" style="justify-content:flex-start;margin:0 0 12px"><button id="stamBuy" ${G.coins < 100 || st0 >= STAM_MAX ? 'disabled' : ''}>⚡ 기력 +10 충전 (100🔥)</button></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr))">${REGIONS.map((R, i) => {
+      const open = G.best >= R.unlock;
+      return `<div class="card-ph ${open ? '' : 'dim'}" data-r="${i}" style="border-color:${open ? '#ffb347' : '#444'};text-align:left;padding:12px;pointer-events:auto">
+        <div class="nm" style="font-size:16px">${R.icon} ${R.name}</div>
+        <div class="sub" style="margin:4px 0">${R.desc}</div>
+        <div class="sub">야생 Lv.${R.lv[0]}~${R.lv[1]}${R.rb ? ` · 희귀 출현 ↑${Math.round(R.rb * 100)}%` : ''}</div>
+        <div class="sub" style="color:${open ? '#8aff9a' : '#ff9a9a'}">${open ? '탐험 가능' : `🔒 전투 스테이지 ${R.unlock} 도달 시 개방`}</div></div>`;
+    }).join('')}</div>`;
+  $('stamBuy').onclick = () => { if (G.coins < 100) return; G.coins -= 100; G.stam = Math.min(STAM_MAX, stam() + 10); save(); renderExplore(); updateTop(); };
+  for (const el of $('sheetBody').querySelectorAll('.card-ph[data-r]')) el.onclick = () => {
+    const R = REGIONS[+el.dataset.r];
+    if (G.best < R.unlock) return toast(`전투 스테이지 ${R.unlock}에 도달하면 열려요`);
+    startExplore(+el.dataset.r);
+  };
+}
+
+let X = null;
+function startExplore(ri) {
+  X = { ri, phase: 'idle', t: 0, walk: 0, wild: null, gauge: 0, tries: 0, bait: 0, ring: 0, judge: null, judgeT: 0, appear: 0, msg: `${REGIONS[ri].icon} ${REGIONS[ri].name}에 도착했다. 탐색해 보자!` };
+  mode = 'explore';
+  syncUI();
+  exploreUI();
+}
+function genWild(R) {
+  const rar = rollRarity(R.rb);
+  let pool = COLORS.filter((c) => c.rar === rar && (!R.elem || c.elem === R.elem || c.elem === 'holy'));
+  if (!pool.length || Math.random() < 0.2) pool = COLORS.filter((c) => c.rar === rar);
+  const lv = Math.floor(rand(R.lv[0], R.lv[1] + 1));
+  const st = lv >= 25 ? 2 : lv >= 10 ? 1 : 0;
+  return { c: pick(pool).id, st, lv: Math.min(lv, LV_CAP[st]), star: 0, bond: 0 };
+}
+const capNeed = () => 60 + COLORS[X.wild.c].rar * 12;
+const capTol = () => (24 - COLORS[X.wild.c].rar * 3) * (1 + 0.3 * X.bait);
+const capTarget = () => 70 * Math.max(0.7, S);
+function exploreUI() {
+  const R = REGIONS[X.ri];
+  $('xRegion').textContent = `${R.icon} ${R.name}`;
+  $('xStam').innerHTML = `⚡ <b>${stam()}</b>/${STAM_MAX}`;
+  $('xCoins').innerHTML = `🔥 <b>${fmt(G.coins)}</b>`;
+  $('xMsg').innerHTML = X.msg;
+  const box = $('xBtns');
+  box.innerHTML = '';
+  const add = (label, fn, primary, disabled) => {
+    const b = document.createElement('button');
+    b.textContent = label; if (primary) b.className = 'primary'; b.disabled = !!disabled;
+    b.onclick = fn; box.appendChild(b);
+  };
+  if (X.phase === 'idle') add('🔍 탐색하기 (⚡1)', exploreStep, true, stam() < 1);
+  else if (X.phase === 'encounter') {
+    add('🎯 포획 시도', startCapture, true);
+    add(`🍖 먹이 던지기 (20🔥)${X.bait ? ` ×${X.bait}` : ''}`, throwBait, false, G.coins < 20 || X.bait >= 3);
+    add('🏃 도망치기', () => { X.phase = 'idle'; X.wild = null; X.msg = '조용히 자리를 떴다…'; exploreUI(); });
+  }
+  $('xBack').disabled = X.phase === 'capture' || X.phase === 'walk';
+}
+function exploreStep() {
+  if (X.phase !== 'idle') return;
+  if (stam() < 1) return toast('탐험 기력이 부족해요. 잠시 쉬거나 충전하세요 ⚡');
+  G.stam--;
+  X.phase = 'walk'; X.t = 0; X.msg = '수풀을 헤치며 탐색 중…';
+  save();
+  exploreUI();
+}
+function resolveExplore() {
+  const R = REGIONS[X.ri];
+  const r = Math.random();
+  if (r < 0.68) {
+    X.wild = genWild(R);
+    X.phase = 'encounter'; X.appear = 0; X.bait = 0; X.gauge = 0; X.tries = 0;
+    const C = COLORS[X.wild.c];
+    X.msg = `야생 <b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> <b>${esc(C.name)}</b> (${STAGE_NAMES[X.wild.st]} Lv.${X.wild.lv})이(가) 나타났다!${G.dex[C.id] ? '' : ' <b style="color:#ffd04a">미발견!</b>'}`;
+    SFX.chirp(X.wild.st);
+    if (C.rar >= 3) SFX.evolve();
+  } else if (r < 0.88) {
+    const n = Math.round(rand(15, 35) * (X.ri + 1));
+    G.coins += n;
+    X.phase = 'idle'; X.msg = `반짝이는 불씨 더미를 찾았다! 🔥 +${n}`;
+    floatText(W / 2, H * 0.45, `🔥 +${n}`, '#ffd04a', 26);
+    emit(W / 2, H * 0.5, 30, { smin: 60, smax: 220 });
+    SFX.pick();
+  } else if (r < 0.95) {
+    const cid = randomColorOf(rollRarity(R.rb));
+    const isNew = !G.dex[cid];
+    const p = addPhoenix({ c: cid, st: 0, lv: 1 });
+    const C = COLORS[cid];
+    X.phase = 'idle'; X.msg = '버려진 불사조의 알을 발견해 부화시켰다!';
+    SFX.evolve();
+    showModal('🥚 알 발견!', `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${bigURL(p.c, 0)}" alt=""></div><p><b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> ${esc(C.name)}${isNew ? ' <b style="color:#ffd04a">NEW!</b>' : ''}</p>`, [{ label: '확인', primary: true, fn: exploreUI }]);
+  } else {
+    X.phase = 'idle'; X.msg = '아무것도 찾지 못했다…';
+  }
+  save();
+  exploreUI();
+  updateTop();
+}
+function throwBait() {
+  if (X.phase !== 'encounter' || G.coins < 20 || X.bait >= 3) return;
+  G.coins -= 20; X.bait++;
+  X.msg = `먹이를 던졌다! 불사조가 조금 경계를 푼다. (포획 판정 범위 +${X.bait * 30}%)`;
+  const c = wildCenter();
+  emit(c[0], c[1], 14, { kind: 'heart', angle: -Math.PI / 2, spread: 0.6, smin: 40, smax: 90, rise: 0, lmin: 1, lmax: 1.5, rmin: 3, rmax: 4 });
+  SFX.eat();
+  save();
+  exploreUI();
+}
+function startCapture() {
+  X.phase = 'capture'; X.tries = 0; X.gauge = 0;
+  X.ring = capTarget() * 3.2; X.wait = 0.5; X.judge = null;
+  X.msg = '고리가 금빛 원에 겹칠 때 탭 / 스페이스! (3번의 기회)';
+  exploreUI();
+}
+function judgeCapture(timeout) {
+  if (!X || X.phase !== 'capture' || X.wait > 0) return;
+  const d = Math.abs(X.ring - capTarget()), tol = capTol();
+  const j = timeout ? 'MISS' : d < tol * 0.4 ? 'PERFECT' : d < tol ? 'GOOD' : 'MISS';
+  X.judge = j; X.judgeT = 0.7;
+  X.gauge += j === 'PERFECT' ? 55 : j === 'GOOD' ? 32 : 0;
+  X.tries++;
+  const [cx, cy] = wildCenter();
+  if (j === 'PERFECT') { SFX.perfect(); emit(cx, cy, 30, { color: COLORS[X.wild.c].glow, smin: 80, smax: 240 }); }
+  else if (j === 'GOOD') { SFX.good(); emit(cx, cy, 12, { color: COLORS[X.wild.c].glow }); }
+  else SFX.miss();
+  if (X.gauge >= capNeed()) return setTimeout(captureSuccess, 450);
+  if (X.tries >= 3) return setTimeout(captureFail, 450);
+  X.ring = capTarget() * 3.2; X.wait = 0.55;
+}
+function captureSuccess() {
+  if (!X || X.phase !== 'capture') return;
+  const w = X.wild, C = COLORS[w.c];
+  const isNew = !G.dex[w.c];
+  const p = addPhoenix({ c: w.c, st: w.st, lv: w.lv, bond: 10 });
+  X.phase = 'idle'; X.wild = null;
+  X.msg = `${esc(C.name)}을(를) 길들여 포획했다! 보관함에 들어갔어요.`;
+  save();
+  SFX.win();
+  showModal('🎉 포획 성공!', `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${bigURL(p.c, p.st)}" alt=""></div>
+    <p><b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> ${esc(C.name)}${isNew ? ' <b style="color:#ffd04a">NEW!</b>' : ''}</p>
+    <p>${ELEM[C.elem].i} ${STAGE_NAMES[p.st]} 불사조 · Lv.${p.lv} · 전투력 ${fmt(statsOf(p).power)}</p>`,
+    [{ label: '바로 출전', fn: () => { p.party = true; save(); exploreUI(); } }, { label: '계속 탐험', primary: true, fn: exploreUI }]);
+  updateTop();
+}
+function captureFail() {
+  if (!X || X.phase !== 'capture') return;
+  const flee = Math.random() < 0.45 + COLORS[X.wild.c].rar * 0.1;
+  if (flee) {
+    const [cx, cy] = wildCenter();
+    emit(cx, cy, 40, { color: COLORS[X.wild.c].glow, angle: -Math.PI / 2, spread: 0.8, smin: 120, smax: 380 });
+    X.msg = `${esc(COLORS[X.wild.c].name)}이(가) 하늘로 날아가 버렸다…`;
+    X.wild = null; X.phase = 'idle';
+    SFX.lose();
+  } else {
+    X.phase = 'encounter';
+    X.msg = '아슬아슬하게 빠져나갔다! 아직 도망치지 않았어요. 다시 시도해 보세요.';
+  }
+  exploreUI();
+}
+function wildCenter() {
+  const h = Math.min(H * 0.5, W * 0.42) * [0.72, 1, 1.12][X.wild ? X.wild.st : 1];
+  return [W * (W < 640 ? 0.55 : 0.62), H * 0.47, h];
+}
+function updateExplore(dt) {
+  X.t += dt;
+  if (X.judgeT > 0) X.judgeT -= dt;
+  if (X.phase === 'walk') {
+    X.walk += dt;
+    if (Math.random() < dt * 10) emit(rand(0, W), H * 0.85, 1, { color: '160,130,110', angle: -Math.PI / 2, spread: 1, smin: 10, smax: 40, rise: 10, lmax: 0.8 });
+    if (X.t > 1.4) resolveExplore();
+  } else if (X.phase === 'capture') {
+    if (X.wait > 0) X.wait -= dt;
+    else {
+      X.ring -= capTarget() * (1.7 + COLORS[X.wild.c].rar * 0.28 + X.tries * 0.15) * dt;
+      if (X.ring < capTarget() - 30) judgeCapture(true);
+    }
+  }
+  if (X.wild) X.appear = Math.min(1, X.appear + dt * 2.5);
+}
+function drawExplore() {
+  const portrait = W / H < 1.15;
+  const sc = (portrait ? Math.max(W / IMG_W, H * 0.9 / IMG_H) : Math.max(W / IMG_W, H / IMG_H)) * 1.12;
+  const span = IMG_W * sc - W;
+  const ox = -(Math.sin(X.walk * 0.55 + X.ri * 1.3) * 0.5 + 0.5) * span;
+  const oy = Math.min(0, (H - IMG_H * sc) / 2) + (X.phase === 'walk' ? Math.abs(Math.sin(X.t * 7)) * 4 : 0);
+  drawBG({ sc, ox, oy }, 0.15);
+  ctx.fillStyle = REGIONS[X.ri].tint;
+  ctx.fillRect(0, 0, W, H);
+  drawAmbient();
+  // companion
+  const r = rep();
+  if (r) {
+    const img = colored(r.c, r.st, false);
+    const hh = Math.min(H * 0.26, 190 * Math.max(0.7, S));
+    const ww = (img.width / img.height) * hh;
+    ctx.save();
+    ctx.translate(16 + ww / 2, H - 160 - hh / 2 + (X.phase === 'walk' ? -Math.abs(Math.sin(X.t * 7)) * 8 : 0));
+    if (FACING[r.st] === -1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);
+    ctx.restore();
+  }
+  if (X.phase === 'walk') {
+    ctx.font = `700 ${22 * Math.max(0.8, S)}px sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#ffeedd';
+    ctx.fillText('탐색 중' + '.'.repeat(1 + Math.floor(X.t * 3) % 3), W / 2, H * 0.4);
+  }
+  if (X.wild) {
+    const C = COLORS[X.wild.c];
+    const [cx, cy, hh] = wildCenter();
+    const img = colored(X.wild.c, X.wild.st, false);
+    const a = X.appear;
+    const k = (hh / img.height) * (0.6 + 0.4 * a);
+    const ww = img.width * k, h2 = img.height * k;
+    glow(cx, cy, hh * 0.75, C.glow, 0.45 * a);
+    if (C.rar >= 3) glow(cx, cy, hh * (0.9 + 0.1 * Math.sin(T * 4)), RARITY_COL[C.rar] === '#ffb347' ? '255,180,70' : '255,90,130', 0.3 * a);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(cx, cy + Math.sin(T * 2.5) * hh * 0.02);
+    if (FACING[X.wild.st] === 1) ctx.scale(-1, 1);
+    ctx.drawImage(img, -ww / 2, -h2 / 2, ww, h2);
+    ctx.restore();
+    if (Math.random() < 0.4) emit(cx + rand(-ww, ww) * 0.4, cy + rand(-h2, h2) * 0.4, 1, { color: C.glow, angle: -Math.PI / 2, spread: 0.5, smin: 10, smax: 40, rise: 40 });
+    // name tag
+    ctx.textAlign = 'center';
+    ctx.font = `700 ${Math.max(14, 17 * S)}px sans-serif`;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    const tag = `${RARITY[C.rar]} · ${C.name} · Lv.${X.wild.lv}`;
+    const ty = Math.max(70, cy - h2 / 2 - 8);
+    ctx.strokeText(tag, cx, ty); ctx.fillStyle = RARITY_COL[C.rar]; ctx.fillText(tag, cx, ty);
+    if (X.phase === 'capture') {
+      const tr = capTarget(), tol = capTol();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,215,120,0.25)';
+      ctx.lineWidth = tol * 2;
+      ctx.beginPath(); ctx.arc(cx, cy, tr, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,215,120,0.95)';
+      ctx.shadowColor = '#ffb347'; ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.arc(cx, cy, tr, 0, Math.PI * 2); ctx.stroke();
+      if (X.wait <= 0) {
+        ctx.lineWidth = 5; ctx.strokeStyle = `rgba(${C.glow},0.95)`;
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, X.ring), 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+      // capture gauge
+      const bw = Math.min(260, W * 0.6), bx = cx - bw / 2, by = Math.min(H - 150, cy + h2 / 2 + 14);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx - 2, by - 2, bw + 4, 14);
+      ctx.fillStyle = '#ffd04a'; ctx.fillRect(bx, by, bw * Math.min(1, X.gauge / capNeed()), 10);
+      ctx.font = '600 12px sans-serif'; ctx.fillStyle = '#ffeedd';
+      ctx.fillText(`길들이기 ${Math.min(100, Math.round((X.gauge / capNeed()) * 100))}% · 남은 기회 ${3 - X.tries}`, cx, by + 28);
+    }
+    if (X.judge && X.judgeT > 0) {
+      ctx.font = '800 30px sans-serif';
+      ctx.fillStyle = { PERFECT: '#ffe066', GOOD: '#9fe0ff', MISS: '#ff7a7a' }[X.judge];
+      ctx.globalAlpha = Math.min(1, X.judgeT * 3);
+      ctx.fillText({ PERFECT: '완벽!', GOOD: '좋아!', MISS: '빗나감…' }[X.judge], cx, cy - capTarget() - 26);
+      ctx.globalAlpha = 1;
+    }
+  }
+  drawParts();
 }
 
 // ============================================================
@@ -1293,12 +1625,13 @@ function act(u) {
     u.lunge = 1;
     SFX.fire();
     const targets = foes.length > 12 ? foes.sort(() => Math.random() - 0.5).slice(0, 12) : foes;
-    for (const f of targets) B.shots.push({ u, f, t: 0, dur: 0.45, mult: 0.55, big: false });
+    for (const f of targets) B.shots.push({ u, f, t: 0, dur: 0.45, mult: 0.55, kind: 'ball' });
     if (!B.many) floatText(u.x, u.y - u.s * 0.55, '화염 날개', '#ffd04a', 15);
     return;
   }
   u.lunge = 1;
-  B.shots.push({ u, f: chooseTarget(u, foes), t: 0, dur: 0.35, mult: 1, big: true });
+  if (!B.many || Math.random() < 0.15) SFX.breath();
+  B.shots.push({ u, f: chooseTarget(u, foes), t: 0, dur: 0.55, mult: 1, kind: 'breath' });
 }
 function hitUnit(att, f, mult) {
   if (f.dead) {
@@ -1337,6 +1670,8 @@ function useUlt(side) {
   B.storm = 1.2; B.stormSide = side;
   SFX.storm();
   const targets = alive(side === 0 ? B.foes : B.allies);
+  const casters = alive(side === 0 ? B.allies : B.foes).sort(() => Math.random() - 0.5).slice(0, 24);
+  if (targets.length) for (const c of casters) B.shots.push({ u: c, f: pick(targets), t: 0, dur: 0.7, mult: 0, kind: 'breath', visual: true });
   for (const f of targets) {
     dealDamage(f, Math.max(1, Math.round(f.max * (f.boss ? 0.1 : 0.24))), side);
     emit(f.x, f.y, 10, { smin: 60, smax: 200, rise: 50, color: '255,150,50' });
@@ -1356,7 +1691,18 @@ function updateBattle(rawDt) {
   }
   for (const s of B.shots) {
     s.t += dt;
-    if (s.t >= s.dur && !s.done) { s.done = true; hitUnit(s.u, s.f, s.mult); }
+    const hitAt = s.kind === 'breath' ? s.dur * 0.55 : s.dur;
+    if (s.t >= hitAt && !s.hit) {
+      s.hit = true;
+      if (!s.visual) hitUnit(s.u, s.f, s.mult);
+      emit(s.f.x, s.f.y, B.many ? 3 : 12, { color: s.u.glow, smin: 60, smax: 220, rise: 40, rmax: 4 });
+    }
+    if (s.kind === 'breath' && !s.hit && (!B.many || Math.random() < 0.25)) {
+      const [mx, my] = mouthPos(s.u);
+      const q = Math.random() * Math.min(1, s.t / (s.dur * 0.55));
+      emit(lerp(mx, s.f.x, q), lerp(my, s.f.y, q), 1, { color: s.u.glow, smin: 10, smax: 60, rise: 50, rmax: 3.5, lmax: 0.6 });
+    }
+    if (s.t >= s.dur) s.done = true;
   }
   B.shots = B.shots.filter((s) => !s.done);
   if (B.storm > 0) B.storm -= rawDt;
@@ -1407,6 +1753,64 @@ function drawUnit(u) {
     ctx.fillText(`${u.boss ? '👹 ' : ''}${ELEM[u.elem].i}Lv.${u.p.lv}`, u.x, by + bh + Math.max(11, u.s * 0.1));
   }
 }
+// mouth (beak) positions inside each stage's sprite, used for flame breath
+const MOUTH = [[150, 84], [250, 142], [190, 160]];
+function mouthPos(u) {
+  const m = A[STAGE_KEYS[u.p.st]];
+  const box = u.s * 0.92;
+  const k = Math.min(box / m.w, box / m.h);
+  const dir = u.side === 0 ? 1 : -1;
+  const face = FACING[u.p.st];
+  const flip = face !== 0 && face !== dir;
+  let lx = (MOUTH[u.p.st][0] - m.w / 2) * k;
+  const ly = (MOUTH[u.p.st][1] - m.h / 2) * k;
+  if (flip) lx = -lx;
+  const bob = Math.sin(T * 3 + u.x * 0.05) * u.s * 0.02;
+  return [u.x + dir * u.lunge * u.s * 0.25 + lx, u.y + bob + ly];
+}
+function drawBreath(s) {
+  const [mx, my] = mouthPos(s.u);
+  const reach = s.dur * 0.55;
+  const f = Math.min(1, s.t / reach);
+  const fade = s.t <= reach ? 1 : clamp(1 - (s.t - reach) / (s.dur - reach), 0, 1);
+  const tx = s.f.x + (s.f.side === 0 ? 1 : -1) * 0, ty = s.f.y;
+  const ex = lerp(mx, tx, f), ey = lerp(my, ty, f);
+  const len = Math.hypot(ex - mx, ey - my);
+  if (len < 2) return;
+  const ang = Math.atan2(ey - my, ex - mx);
+  const w0 = Math.max(2.5, s.u.s * 0.025);
+  const w1 = Math.max(9, s.u.s * 0.17) * (0.85 + 0.15 * Math.sin(T * 40 + s.u.x));
+  ctx.save();
+  ctx.translate(mx, my);
+  ctx.rotate(ang);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = fade;
+  const g = ctx.createLinearGradient(0, 0, len + w1, 0);
+  g.addColorStop(0, 'rgba(255,255,235,1)');
+  g.addColorStop(0.2, `rgba(${s.u.glow},0.95)`);
+  g.addColorStop(0.75, `rgba(${s.u.glow},0.6)`);
+  g.addColorStop(1, `rgba(${s.u.glow},0)`);
+  ctx.fillStyle = g;
+  const N = B.many ? 4 : 9;
+  ctx.beginPath();
+  ctx.moveTo(0, -w0);
+  for (let i = 1; i <= N; i++) { const q = i / N; ctx.lineTo(len * q, -lerp(w0, w1, Math.sqrt(q)) + Math.sin(T * 31 + i * 1.7) * w1 * 0.22); }
+  ctx.quadraticCurveTo(len + w1 * 0.9, 0, len, lerp(w0, w1, 1));
+  for (let i = N; i >= 1; i--) { const q = i / N; ctx.lineTo(len * q, lerp(w0, w1, Math.sqrt(q)) + Math.sin(T * 27 + i * 2.3) * w1 * 0.22); }
+  ctx.lineTo(0, w0);
+  ctx.closePath();
+  ctx.fill();
+  // white-hot core
+  ctx.fillStyle = 'rgba(255,250,225,0.85)';
+  ctx.beginPath();
+  ctx.moveTo(0, -w0 * 0.6);
+  ctx.quadraticCurveTo(len * 0.5, -w1 * 0.28, len * 0.92, 0);
+  ctx.quadraticCurveTo(len * 0.5, w1 * 0.28, 0, w0 * 0.6);
+  ctx.fill();
+  ctx.restore();
+  glow(mx, my, w1 * 1.3, s.u.glow, 0.7 * fade);
+  if (f >= 1) glow(ex, ey, w1 * 2.2, s.u.glow, 0.6 * fade);
+}
 function drawBattle() {
   const t = homeT();
   drawBG(t, 0.5);
@@ -1417,10 +1821,17 @@ function drawBattle() {
   for (const u of B.allies) drawUnit(u);
   for (const u of B.foes) drawUnit(u);
   for (const s of B.shots) {
+    if (s.kind === 'breath') { drawBreath(s); continue; }
     const f = Math.min(1, s.t / s.dur);
-    const x = lerp(s.u.x, s.f.x, f), y = lerp(s.u.y, s.f.y, f) - Math.sin(f * Math.PI) * 40 * S;
-    const r = (s.big ? 9 : 6) * Math.max(0.6, Math.min(1.4, s.u.s / 120));
-    glow(x, y, r * 3, s.u.glow, 0.7);
+    const [mx, my] = mouthPos(s.u);
+    const x = lerp(mx, s.f.x, f), y = lerp(my, s.f.y, f) - Math.sin(f * Math.PI) * 40 * S;
+    const r = 7 * Math.max(0.6, Math.min(1.4, s.u.s / 120));
+    // comet tail
+    for (let k = 1; k <= 3; k++) {
+      const f2 = Math.max(0, f - k * 0.06);
+      glow(lerp(mx, s.f.x, f2), lerp(my, s.f.y, f2) - Math.sin(f2 * Math.PI) * 40 * S, r * (3 - k * 0.6), s.u.glow, 0.35);
+    }
+    glow(x, y, r * 3, s.u.glow, 0.8);
     ctx.fillStyle = '#fff6d0';
     ctx.beginPath(); ctx.arc(x, y, r * 0.6, 0, Math.PI * 2); ctx.fill();
   }
@@ -1494,6 +1905,7 @@ function frame(now) {
     if (mode === 'rhythm') updateRhythm(dt);
     else if (mode === 'catch') updateCatch(dt);
     else if (mode === 'battle') updateBattle(dt);
+    else if (mode === 'explore') updateExplore(dt);
     if (mode === 'home') {
       updateEvo(dt);
       chatterT -= dt;
@@ -1502,6 +1914,7 @@ function frame(now) {
   }
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (mode === 'catch' && ca) drawCatch();
+  else if (mode === 'explore' && X) drawExplore();
   else if (mode === 'battle' && B) drawBattle();
   else drawHome();
   if (G) {
@@ -1521,6 +1934,7 @@ cv.addEventListener('pointerdown', (e) => {
   const x = e.clientX, y = e.clientY;
   if (mode === 'rhythm') return judgeRing(false);
   if (mode === 'catch') { ca.tx = x; return; }
+  if (mode === 'explore') { if (X && X.phase === 'capture') judgeCapture(false); return; }
   if (mode !== 'home' || tab !== 'home' || evo) return;
   const t = homeT();
   for (const s of [2, 1, 0]) {
@@ -1542,6 +1956,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (mode === 'rhythm' && !modalOpen) judgeRing(false);
     else if (mode === 'battle') useUlt(0);
+    else if (mode === 'explore' && X && X.phase === 'capture') judgeCapture(false);
   }
   if (mode === 'catch' && ca) {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') ca.kv = -1;
@@ -1561,6 +1976,7 @@ for (const b of document.querySelectorAll('#nav button')) b.onclick = () => goTa
 $('bSpeed').onclick = () => { G.speed = G.speed === 1 ? 2 : G.speed === 2 ? 4 : 1; $('bSpeed').textContent = `▶ x${G.speed}`; save(); };
 $('bTactic').onchange = (e) => { G.tactic = e.target.value; save(); };
 $('ultBtn').onclick = () => useUlt(0);
+$('xBack').onclick = () => { X = null; mode = 'home'; parts = []; goTab('explore'); };
 $('bRetreat').onclick = () => {
   showModal('후퇴할까요?', '<p>전투를 포기하고 돌아갑니다. 보상은 없어요.</p>', [
     { label: '계속 싸우기' },
@@ -1599,7 +2015,11 @@ $('btnNew').onclick = () => {
   const saved = load();
   if (saved) {
     $('btnContinue').classList.remove('hidden');
-    $('btnContinue').onclick = () => { G = Object.assign({ dexClaim: 0 }, saved); begin(); };
+    $('btnContinue').onclick = () => {
+      G = Object.assign({ dexClaim: 0 }, saved);
+      while (G.dex.length < NCOL) G.dex.push(0);
+      begin();
+    };
   }
   requestAnimationFrame(frame);
 })();
