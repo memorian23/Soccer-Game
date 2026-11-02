@@ -1009,10 +1009,41 @@ function renderStorage() {
   sortFilterTools(renderStorage);
   tool('모두 출전', () => { filtered().forEach((p) => (p.party = true)); save(); renderStorage(); updateTop(); });
   tool('모두 대기', () => { filtered().forEach((p) => (p.party = false)); save(); renderStorage(); updateTop(); });
+  tool('✨ 모두 진화', evolveAll, 'primary');
   const list = filtered();
   $('sheetBody').innerHTML = `<p class="hint">불사조를 눌러 상세 정보를 보고 출전·대표·진화·방생을 할 수 있어요. 출전 수와 보관 수에는 제한이 없습니다.</p>` +
     (list.length ? `<div class="grid">${list.map((p) => cardHTML(p)).join('')}</div>` : '<p class="hint">해당하는 불사조가 없어요.</p>');
   for (const el of $('sheetBody').querySelectorAll('.card-ph')) el.onclick = () => showDetail(byUid(+el.dataset.uid));
+}
+// evolve every non-adult phoenix in the current storage view, one stage or all the way to 어른
+function evolveAll() {
+  const list = filtered().filter((p) => p.st < 2).sort(SORTS.power);
+  if (!list.length) return toast('진화할 불사조가 없어요 (모두 어른이에요)');
+  const oneCost = list.reduce((a, p) => a + EVO[p.st].cost, 0);
+  const fullCost = list.reduce((a, p) => a + (p.st === 0 ? EVO[0].cost + EVO[1].cost : EVO[1].cost), 0);
+  const chicks = list.filter((p) => p.st === 0).length, youngs = list.length - chicks;
+  const run = (full) => {
+    let n = 0, spent = 0, ran = false;
+    for (const p of list) {
+      while (p.st < 2 && G.coins >= EVO[p.st].cost) {
+        G.coins -= EVO[p.st].cost; spent += EVO[p.st].cost;
+        p.st++; n++;
+        if (p.st === 2) p.bond = Math.min(100, p.bond + 5);
+        if (!full) break;
+      }
+      if (p.st < 2 && G.coins < EVO[p.st].cost) { ran = true; break; }
+    }
+    save();
+    SFX.evolve();
+    toast(n ? `✨ ${n}번 진화했어요! (불씨 ${fmt(spent)} 사용)${ran ? ' · 불씨가 모자라 일부만 진화' : ''}` : '불씨가 부족해요', 3);
+    renderStorage(); updateTop();
+  };
+  showModal('✨ 모두 진화', `<p>현재 보관함 목록의 진화 가능한 불사조 <b>${list.length}마리</b> (새끼 ${chicks} · 청년 ${youngs})</p>
+    <p class="odds">한 단계씩: 불씨 ${fmt(oneCost)} · 모두 어른까지: 불씨 ${fmt(fullCost)}<br>보유 불씨 ${fmt(G.coins)} — 모자라면 전투력이 높은 순서로 가능한 만큼만 진화해요.</p>`, [
+    { label: '취소' },
+    { label: `한 단계씩 진화 (${fmt(oneCost)}🔥)`, fn: () => run(false) },
+    { label: `모두 어른으로 (${fmt(fullCost)}🔥)`, primary: true, fn: () => run(true) },
+  ]);
 }
 function showDetail(p) {
   const C = COLORS[p.c], s = statsOf(p);
