@@ -1139,6 +1139,7 @@ function renderFusion() {
 
 // ---------------- 부화 ----------------
 const EGG_W = [60, 28, 9, 2.7, 0.3];
+const EGG_PRICE = { 1: 20, 10: 180, 100: 1500 };
 function rollRarity(bonus = 0) {
   const w = EGG_W.map((v, i) => (i === 0 ? Math.max(5, v - bonus * 60) : v * (1 + bonus * i)));
   let r = Math.random() * w.reduce((a, b) => a + b, 0);
@@ -1152,13 +1153,13 @@ function renderHatch() {
   $('sheetBody').innerHTML = `<div class="center">
     <canvas id="eggCv" width="220" height="220" style="width:180px;height:180px;position:static;margin:0 auto"></canvas>
     <p class="hint">불사조의 알을 부화하면 200가지 색 중 하나가 새끼 불사조로 태어나요. 신 등급 10종은 상점의 신의 알, 50스테이지마다 나오는 신의 보스, 천공의 성역 탐험, 신화끼리의 합성으로 얻을 수 있어요.</p>
-    <div class="row"><button id="egg1" class="primary">알 1개 부화 (100🔥)</button><button id="egg10" class="primary">10연 부화 (900🔥)</button></div>
-    <p class="odds" style="margin-top:12px">${RARITY.map((r, i) => `<span style="color:${RARITY_COL[i]}">${r} ${EGG_W[i]}%</span>`).join(' · ')}<br>신화 10종(흑염·백염·무지개·은하·황혼·태초·심연·오로라·성운·불멸)은 부화, 합성 승급, 보스 포획, 천공의 성역 탐험으로 얻을 수 있어요.</p>
+    <div class="row"><button id="egg1" class="primary">알 1개 부화 (${EGG_PRICE[1]}🔥)</button><button id="egg10" class="primary">10연 부화 (${EGG_PRICE[10]}🔥)</button><button id="egg100" class="primary">100연 부화 (${fmt(EGG_PRICE[100])}🔥)</button></div>
+    <p class="odds" style="margin-top:12px">${EGG_W.map((w, i) => `<span style="color:${RARITY_COL[i]}">${RARITY[i]} ${w}%</span>`).join(' · ')} · <span style="color:${RARITY_COL[5]}">신 등급은 일반 알에서 나오지 않아요</span><br>신화 10종(흑염·백염·무지개·은하·황혼·태초·심연·오로라·성운·불멸)은 부화, 합성 승급, 보스 포획, 천공의 성역 탐험으로 얻을 수 있어요.</p>
   </div>`;
-  $('egg1').disabled = G.coins < 100;
-  $('egg10').disabled = G.coins < 900;
-  $('egg1').onclick = () => hatch(1, 100);
-  $('egg10').onclick = () => hatch(10, 900);
+  for (const n of [1, 10, 100]) {
+    $('egg' + n).disabled = G.coins < EGG_PRICE[n];
+    $('egg' + n).onclick = () => hatch(n, EGG_PRICE[n]);
+  }
   drawEgg();
   if (!eggRAF) eggRAF = requestAnimationFrame(eggTick);
 }
@@ -1202,9 +1203,9 @@ function hatch(n, cost) {
     const { p, isNew } = got[0], C = COLORS[p.c];
     html = `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${bigURL(p.c, 0)}" alt=""></div><p><b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> ${esc(C.name)}${isNew ? ' <b style="color:#ffd04a">NEW!</b>' : ''}</p>`;
   } else {
-    html = `<div class="reveal-grid">${got.map(({ p, isNew }, i) => { const C = COLORS[p.c]; return `<div style="border-color:${RARITY_COL[C.rar]};animation-delay:${i * 0.08}s"><img src="${thumbURL(p.c, 0)}" alt="">${esc(C.short)}${isNew ? '<br><b style="color:#ffd04a">NEW</b>' : ''}</div>`; }).join('')}</div>`;
+    html = `<div class="reveal-grid">${got.map(({ p, isNew }, i) => { const C = COLORS[p.c]; return `<div style="border-color:${RARITY_COL[C.rar]};animation-delay:${Math.min(i * 0.08, 0.8 + i * 0.01).toFixed(2)}s"><img src="${thumbURL(p.c, 0)}" alt="">${esc(C.short)}${isNew ? '<br><b style="color:#ffd04a">NEW</b>' : ''}</div>`; }).join('')}</div>`;
   }
-  showModal(n === 1 ? '🥚 부화!' : '🥚 10연 부화!', html + '<p class="odds">새 불사조는 보관함에 들어갔어요. 보관함에서 출전시킬 수 있어요.</p>', [{ label: '확인', primary: true, fn: renderHatch }]);
+  showModal(n === 1 ? '🥚 부화!' : `🥚 ${n}연 부화!`, html + '<p class="odds">새 불사조는 보관함에 들어갔어요. 보관함에서 출전시킬 수 있어요.</p>', [{ label: '확인', primary: true, fn: renderHatch }]);
   updateTop();
 }
 
@@ -1289,9 +1290,9 @@ const ITEMS = [
   { id: 'def', name: '수호의 비약', icon: '🛡️', price: 200, use: 'battle', desc: '전투 1회 동안 아군 방어력 +30%' },
   { id: 'rev', name: '불사의 깃털', icon: '🕊️', price: 400, use: 'battle', desc: '전투 1회 동안 모든 아군이 한 번 더 부활' },
   { id: 'ult', name: '폭풍의 핵', icon: '🌪️', price: 300, use: 'battle', desc: '전투 시작부터 피닉스 폭풍 게이지 100%' },
-  { id: 'luck_egg', name: '행운의 알', icon: '🥚', price: 1500, use: 'now', desc: '영웅 등급 이상 확정 부화' },
-  { id: 'myth_egg', name: '신화의 알', icon: '🌈', price: 8000, use: 'now', desc: '신화 등급 확정 부화' },
-  { id: 'god_egg', name: '신의 알', icon: '👑', price: 30000, use: 'now', desc: '신 등급 불사조 확정 부화 (10종 중 하나)' },
+  { id: 'luck_egg', name: '행운의 알', icon: '🥚', price: 300, use: 'now', desc: '영웅 등급 이상 확정 부화' },
+  { id: 'myth_egg', name: '신화의 알', icon: '🌈', price: 1500, use: 'now', desc: '신화 등급 확정 부화' },
+  { id: 'god_egg', name: '신의 알', icon: '👑', price: 5000, use: 'now', desc: '신 등급 불사조 확정 부화 (10종 중 하나)' },
 ];
 const ITEM = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 const BATTLE_ITEMS = ITEMS.filter((i) => i.use === 'battle');
@@ -1308,7 +1309,7 @@ function renderShop() {
   const owned = ITEMS.filter((i) => inv(i.id) > 0);
   $('sheetBody').innerHTML = `<p class="hint">불씨로 아이템을 사서 가방에 보관하세요. 보유 불씨 🔥 <b>${fmt(G.coins)}</b></p>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${ITEMS.map((it) => `
-      <div class="card-ph" style="border-color:${it.price >= 8000 ? '#fff1a0' : it.price >= 1000 ? '#ffb347' : '#6a4a3a'};text-align:left;padding:10px;cursor:default">
+      <div class="card-ph" style="border-color:${it.id === 'god_egg' || it.id === 'myth_egg' ? '#fff1a0' : it.price >= 1000 || it.id === 'luck_egg' ? '#ffb347' : '#6a4a3a'};text-align:left;padding:10px;cursor:default">
         <div class="nm" style="font-size:15px">${it.icon} ${it.name} <span class="sub">(보유 ${inv(it.id)})</span></div>
         <div class="sub" style="margin:4px 0 6px;min-height:30px">${it.desc}<br><i>${USE_WHERE[it.use]}</i></div>
         <div class="row" style="justify-content:flex-start;margin-top:4px">
