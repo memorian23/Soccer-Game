@@ -1139,7 +1139,7 @@ function renderFusion() {
 
 // ---------------- 부화 ----------------
 const EGG_W = [60, 28, 9, 2.7, 0.3];
-const EGG_PRICE = { 1: 20, 10: 180, 100: 1500 };
+const EGG_PRICE = { 1: 1, 10: 10, 100: 100 };
 function rollRarity(bonus = 0) {
   const w = EGG_W.map((v, i) => (i === 0 ? Math.max(5, v - bonus * 60) : v * (1 + bonus * i)));
   let r = Math.random() * w.reduce((a, b) => a + b, 0);
@@ -1307,21 +1307,21 @@ function renderBattlePrep() {
 // shop & items
 // ============================================================
 const ITEMS = [
-  { id: 'exp_s', name: '경험치 물약', icon: '🧪', price: 80, use: 'ph', desc: '불사조 1마리 경험치 +300' },
-  { id: 'exp_l', name: '큰 경험치 물약', icon: '⚗️', price: 350, use: 'ph', desc: '불사조 1마리 경험치 +1,500' },
-  { id: 'bond', name: '유대의 깃털', icon: '🪶', price: 150, use: 'ph', desc: '불사조 1마리 유대 +20' },
-  { id: 'star', name: '별의 조각', icon: '⭐', price: 1500, use: 'ph', desc: '불사조 1마리 별 +1 (최대 5, 별당 능력치 +12%)' },
-  { id: 'stam', name: '기력 물약', icon: '⚡', price: 90, use: 'now', desc: '탐험 기력 +10' },
-  { id: 'bait', name: '황금 먹이', icon: '🍯', price: 60, use: 'explore', desc: '탐험에서 야생 불사조에게 사용: 포획 판정 범위 +60%' },
-  { id: 'charm', name: '길들이기 부적', icon: '🧿', price: 250, use: 'explore', desc: '탐험에서 사용: 포획 게이지가 40%에서 시작' },
-  { id: 'atk', name: '분노의 비약', icon: '💢', price: 200, use: 'battle', desc: '전투 1회 동안 아군 공격력 +30%' },
-  { id: 'def', name: '수호의 비약', icon: '🛡️', price: 200, use: 'battle', desc: '전투 1회 동안 아군 방어력 +30%' },
-  { id: 'rev', name: '불사의 깃털', icon: '🕊️', price: 400, use: 'battle', desc: '전투 1회 동안 모든 아군이 한 번 더 부활' },
-  { id: 'ult', name: '폭풍의 핵', icon: '🌪️', price: 300, use: 'battle', desc: '전투 시작부터 피닉스 폭풍 게이지 100%' },
-  { id: 'egg', name: '불사조의 알', icon: '🥚', price: 20, use: 'egg', desc: '일반 알 (모든 등급이 나올 수 있어요)' },
-  { id: 'luck_egg', name: '행운의 알', icon: '🐣', price: 300, use: 'egg', desc: '영웅 등급 이상 확정 부화' },
-  { id: 'myth_egg', name: '신화의 알', icon: '🌈', price: 1500, use: 'egg', desc: '신화 등급 확정 부화' },
-  { id: 'god_egg', name: '신의 알', icon: '👑', price: 5000, use: 'egg', desc: '신 등급 불사조 확정 부화 (10종 중 하나)' },
+  { id: 'exp_s', name: '경험치 물약', icon: '🧪', price: 1, use: 'ph', desc: '불사조 1마리 경험치 +300' },
+  { id: 'exp_l', name: '큰 경험치 물약', icon: '⚗️', price: 1, use: 'ph', desc: '불사조 1마리 경험치 +1,500' },
+  { id: 'bond', name: '유대의 깃털', icon: '🪶', price: 1, use: 'ph', desc: '불사조 1마리 유대 +20' },
+  { id: 'star', name: '별의 조각', icon: '⭐', price: 1, use: 'ph', desc: '불사조 1마리 별 +1 (최대 5, 별당 능력치 +12%)' },
+  { id: 'stam', name: '기력 물약', icon: '⚡', price: 1, use: 'now', desc: '탐험 기력 +10' },
+  { id: 'bait', name: '황금 먹이', icon: '🍯', price: 1, use: 'explore', desc: '탐험에서 야생 불사조에게 사용: 포획 판정 범위 +60%' },
+  { id: 'charm', name: '길들이기 부적', icon: '🧿', price: 1, use: 'explore', desc: '탐험에서 사용: 포획 게이지가 40%에서 시작' },
+  { id: 'atk', name: '분노의 비약', icon: '💢', price: 1, use: 'battle', desc: '전투 1회 동안 아군 공격력 +30%' },
+  { id: 'def', name: '수호의 비약', icon: '🛡️', price: 1, use: 'battle', desc: '전투 1회 동안 아군 방어력 +30%' },
+  { id: 'rev', name: '불사의 깃털', icon: '🕊️', price: 1, use: 'battle', desc: '전투 1회 동안 모든 아군이 한 번 더 부활' },
+  { id: 'ult', name: '폭풍의 핵', icon: '🌪️', price: 1, use: 'battle', desc: '전투 시작부터 피닉스 폭풍 게이지 100%' },
+  { id: 'egg', name: '불사조의 알', icon: '🥚', price: 1, use: 'egg', desc: '일반 알 (모든 등급이 나올 수 있어요)' },
+  { id: 'luck_egg', name: '행운의 알', icon: '🐣', price: 1, use: 'egg', desc: '영웅 등급 이상 확정 부화' },
+  { id: 'myth_egg', name: '신화의 알', icon: '🌈', price: 1, use: 'egg', desc: '신화 등급 확정 부화' },
+  { id: 'god_egg', name: '신의 알', icon: '👑', price: 1, use: 'egg', desc: '신 등급 불사조 확정 부화 (10종 중 하나)' },
 ];
 const ITEM = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 const BATTLE_ITEMS = ITEMS.filter((i) => i.use === 'battle');
@@ -1338,12 +1338,13 @@ function renderShop() {
   const owned = ITEMS.filter((i) => inv(i.id) > 0);
   $('sheetBody').innerHTML = `<p class="hint">불씨로 아이템을 사서 가방에 보관하세요. 보유 불씨 🔥 <b>${fmt(G.coins)}</b></p>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${ITEMS.map((it) => `
-      <div class="card-ph" style="border-color:${it.id === 'god_egg' || it.id === 'myth_egg' ? '#fff1a0' : it.price >= 1000 || it.id === 'luck_egg' ? '#ffb347' : '#6a4a3a'};text-align:left;padding:10px;cursor:default">
+      <div class="card-ph" style="border-color:${it.id === 'god_egg' || it.id === 'myth_egg' ? '#fff1a0' : it.id === 'luck_egg' || it.id === 'star' ? '#ffb347' : '#6a4a3a'};text-align:left;padding:10px;cursor:default">
         <div class="nm" style="font-size:15px">${it.icon} ${it.name} <span class="sub">(보유 ${inv(it.id)})</span></div>
         <div class="sub" style="margin:4px 0 6px;min-height:30px">${it.desc}<br><i>${USE_WHERE[it.use]}</i></div>
         <div class="row" style="justify-content:flex-start;margin-top:4px">
           <button data-buy="${it.id}" data-n="1" ${G.coins < it.price ? 'disabled' : ''}>🔥${fmt(it.price)} 구매</button>
-          ${it.price <= 400 || it.id === 'egg' ? `<button data-buy="${it.id}" data-n="10" ${G.coins < it.price * 10 ? 'disabled' : ''}>×10 (🔥${fmt(it.price * 10)})</button>` : ''}
+          <button data-buy="${it.id}" data-n="10" ${G.coins < it.price * 10 ? 'disabled' : ''}>×10 (🔥${fmt(it.price * 10)})</button>
+          <button data-buy="${it.id}" data-n="100" ${G.coins < it.price * 100 ? 'disabled' : ''}>×100 (🔥${fmt(it.price * 100)})</button>
         </div></div>`).join('')}</div>
     <h3 style="color:var(--accent);margin:18px 0 8px">🎒 가방</h3>
     ${owned.length ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${owned.map((it) => `
