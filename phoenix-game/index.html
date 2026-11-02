@@ -6,7 +6,8 @@
 <title>불사조 길들이기</title>
 <style>
   :root {
-    --panel: rgba(22, 10, 18, 0.72);
+    --panel: rgba(22, 10, 18, 0.78);
+    --sheet: rgba(16, 8, 14, 0.94);
     --line: rgba(255, 170, 80, 0.35);
     --text: #ffeedd;
     --muted: #d9b8a0;
@@ -17,107 +18,188 @@
     margin: 0; height: 100%; overflow: hidden;
     background: #0b0710; color: var(--text);
     font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    touch-action: none; user-select: none; -webkit-user-select: none;
+    user-select: none; -webkit-user-select: none;
   }
-  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-
-  #hud { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; z-index: 2; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; backdrop-filter: blur(4px); }
-  #info { width: 240px; }
-  #pname { font-size: 18px; font-weight: 700; }
-  #pstage { font-size: 12px; color: var(--accent); margin-top: 2px; }
-  .bar { margin-top: 6px; font-size: 12px; }
-  .bar .lbl { display: flex; justify-content: space-between; color: var(--muted); }
-  .bar .track { height: 8px; border-radius: 5px; background: rgba(255,255,255,0.12); overflow: hidden; margin-top: 2px; }
-  .bar .fill { height: 100%; border-radius: 5px; transition: width .25s; }
-  #goal { font-size: 12px; line-height: 1.6; max-width: 260px; text-align: right; }
-  #goal b { color: var(--accent); }
-  .sep { display: none; }
-  #mute { pointer-events: auto; margin-top: 6px; padding: 4px 10px; font-size: 12px; }
-
-  #actions { position: fixed; left: 0; right: 0; bottom: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0 10px; z-index: 2; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .hidden { display: none !important; }
   button {
     font: inherit; color: var(--text); font-size: 14px; cursor: pointer;
     background: linear-gradient(180deg, #5a2a1a, #3a1810);
-    border: 1px solid #ff9a4a66; border-radius: 12px; padding: 9px 14px;
-    box-shadow: 0 0 12px #ff6a1a33;
+    border: 1px solid #ff9a4a66; border-radius: 12px; padding: 8px 13px;
+    box-shadow: 0 0 10px #ff6a1a26;
   }
   button:hover:not(:disabled) { background: linear-gradient(180deg, #7a3a1e, #4a1f12); box-shadow: 0 0 16px #ff8a2a66; }
   button:disabled { opacity: .4; cursor: not-allowed; }
   button.primary { background: linear-gradient(180deg, #ff8a2a, #c8400c); border-color: #ffd08a; font-weight: 700; }
+  button.on { background: linear-gradient(180deg, #ffb347, #d0600c); border-color: #ffe0a0; color: #2a0a00; font-weight: 700; }
+  select { font: inherit; font-size: 13px; color: var(--text); background: #2a1410; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(4px); }
 
-  body.mg #hud, body.mg #actions, body.title #hud, body.title #actions { display: none; }
+  #topbar { position: fixed; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 3; pointer-events: none; }
+  .chip { pointer-events: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; font-size: 13px; white-space: nowrap; }
+  .chip b { color: var(--accent); }
+  #mute { margin-left: auto; padding: 5px 11px; font-size: 13px; border-radius: 999px; pointer-events: auto; }
 
-  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5, 2, 8, .55); z-index: 10; }
-  .hidden { display: none !important; }
-  .card { max-width: 460px; width: calc(100% - 32px); text-align: center; padding: 22px 22px 18px; max-height: calc(100% - 32px); overflow: auto; }
-  .card h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: 2px; background: linear-gradient(180deg, #fff3b0, #ff8a2a 60%, #e0400a); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .card h2 { margin: 0 0 10px; font-size: 22px; color: var(--accent); }
-  .card p { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 8px 0; }
-  .card .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
-  .card input { font: inherit; font-size: 16px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.35); color: var(--text); width: 200px; text-align: center; }
-  .card ul { text-align: left; color: var(--muted); font-size: 13px; line-height: 1.7; padding-left: 20px; margin: 8px 0; }
-  .stat-line { font-size: 15px; margin: 4px 0; }
+  #repCard { position: fixed; left: 8px; top: 46px; width: 230px; padding: 9px 12px; z-index: 2; font-size: 12px; }
+  #repName { font-size: 16px; font-weight: 700; }
+  #repSub { color: var(--muted); margin: 2px 0 4px; }
+  .bar { margin-top: 5px; }
+  .bar .lbl { display: flex; justify-content: space-between; color: var(--muted); }
+  .track { height: 7px; border-radius: 5px; background: rgba(255,255,255,0.12); overflow: hidden; margin-top: 2px; }
+  .fill { height: 100%; border-radius: 5px; transition: width .25s; }
 
-  #toast { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); z-index: 5; pointer-events: none; font-size: 20px; font-weight: 700; color: #fff3d0; text-shadow: 0 0 12px #ff6a1a, 0 2px 4px #000; opacity: 0; transition: opacity .3s; text-align: center; width: max-content; max-width: calc(100% - 32px); }
+  #homeActions { position: fixed; right: 8px; top: 46px; width: 210px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+
+  #nav { position: fixed; left: 0; right: 0; bottom: 0; height: 62px; display: flex; z-index: 4; background: rgba(14,6,10,0.92); border-top: 1px solid var(--line); }
+  #nav button { flex: 1; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 0; color: var(--muted); }
+  #nav button span { font-size: 20px; line-height: 1; }
+  #nav button.active { color: var(--accent); background: linear-gradient(0deg, rgba(255,140,40,0.18), transparent); }
+
+  #sheet { position: fixed; left: 50%; transform: translateX(-50%); width: min(980px, 100%); top: 44px; bottom: 62px; z-index: 3; background: var(--sheet); border: 1px solid var(--line); border-bottom: 0; border-radius: 16px 16px 0 0; display: flex; flex-direction: column; }
+  #sheetHead { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  #sheetHead h2 { margin: 0; font-size: 18px; color: var(--accent); flex: 1; white-space: nowrap; }
+  #sheetTools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  #sheetTools button { padding: 6px 10px; font-size: 12px; }
+  #sheetBody { overflow-y: auto; padding: 12px 14px 20px; flex: 1; -webkit-overflow-scrolling: touch; }
+  p.hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; line-height: 1.6; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+  .card-ph { position: relative; background: rgba(255,255,255,0.04); border: 2px solid #555; border-radius: 12px; padding: 6px 6px 7px; text-align: center; cursor: pointer; font-size: 11px; line-height: 1.35; }
+  .card-ph:hover { background: rgba(255,160,80,0.10); }
+  .card-ph img { width: 100%; height: 76px; object-fit: contain; display: block; margin-bottom: 3px; }
+  .card-ph .nm { font-weight: 700; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-ph .sub { color: var(--muted); }
+  .card-ph .badge { position: absolute; top: 4px; right: 4px; font-size: 10px; background: #c8400c; color: #fff; border-radius: 6px; padding: 1px 5px; }
+  .card-ph .badge.rep { left: 4px; right: auto; background: #b08a20; }
+  .card-ph.sel { outline: 3px solid #ffd04a; }
+  .card-ph.dim { opacity: .35; pointer-events: none; }
+  .card-ph.unknown img { filter: brightness(0) opacity(.55); }
+  .stars { color: #ffd04a; letter-spacing: -1px; }
+
+  .slots { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 12px; }
+  .slot { width: 150px; min-height: 150px; border: 2px dashed var(--line); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; text-align: center; padding: 6px; }
+  .slot img { width: 120px; height: 96px; object-fit: contain; }
+  .slot.active { border-color: #ffd04a; background: rgba(255,200,80,0.08); }
+  .op { font-size: 26px; color: var(--accent); }
+  .center { text-align: center; }
+  .odds { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  table.st { border-collapse: collapse; margin: 6px auto; font-size: 13px; }
+  table.st td { padding: 2px 10px; }
+  table.st td:first-child { color: var(--muted); text-align: right; }
+
+  #battleTop { position: fixed; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; z-index: 3; }
+  #battleTop .chip { font-size: 14px; }
+  #battleTop .sp { margin-left: auto; }
+  #battleBottom { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 3; text-align: center; }
+  #ultBtn { position: relative; overflow: hidden; min-width: 220px; padding: 11px 16px; font-size: 16px; font-weight: 700; }
+  #ultFill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(255,120,30,.55), rgba(255,220,90,.55)); z-index: 0; transition: width .2s; }
+  #ultBtn span { position: relative; z-index: 1; }
+  #ultBtn.ready { animation: pulse 0.8s infinite alternate; }
+  @keyframes pulse { from { box-shadow: 0 0 8px #ff8a2a; } to { box-shadow: 0 0 28px #ffd04a; } }
+
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5, 2, 8, .6); z-index: 10; }
+  .overlay .card { max-width: 520px; width: calc(100% - 28px); text-align: center; padding: 20px 18px 16px; max-height: calc(100% - 28px); overflow: auto; background: var(--sheet); border: 1px solid var(--line); border-radius: 16px; }
+  .overlay h2 { margin: 0 0 10px; font-size: 21px; color: var(--accent); }
+  .overlay p { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 6px 0; }
+  .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+  .reveal img { width: 220px; max-width: 70vw; height: 180px; object-fit: contain; animation: pop .7s ease-out; filter: drop-shadow(0 0 18px var(--glow, #ff8a2a)); }
+  .reveal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; }
+  .reveal-grid div { font-size: 11px; border: 2px solid #555; border-radius: 10px; padding: 4px; animation: pop .5s ease-out both; }
+  .reveal-grid img { width: 100%; height: 60px; object-fit: contain; }
+  @keyframes pop { 0% { transform: scale(.2); opacity: 0; filter: brightness(4); } 70% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+
+  #title { background: linear-gradient(180deg, rgba(5,2,8,.55), rgba(5,2,8,0) 45%, rgba(5,2,8,0) 70%, rgba(5,2,8,.6)); align-items: flex-start; padding-top: 3vh; }
+  #title .card { background: rgba(16,8,14,0.82); }
+  #title h1 { margin: 0 0 2px; font-size: 34px; letter-spacing: 3px; background: linear-gradient(180deg, #fff3b0, #ff8a2a 60%, #e0400a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #title ul { text-align: left; color: var(--muted); font-size: 13px; line-height: 1.7; padding-left: 20px; margin: 8px 0; }
+  input.txt { font: inherit; font-size: 15px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.35); color: var(--text); width: 200px; text-align: center; user-select: text; }
+
+  #toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 20; pointer-events: none; font-size: 19px; font-weight: 700; color: #fff3d0; text-shadow: 0 0 12px #ff6a1a, 0 2px 4px #000; opacity: 0; transition: opacity .3s; text-align: center; width: max-content; max-width: calc(100% - 32px); }
   #toast.show { opacity: 1; }
 
-  @media (max-width: 620px) {
-    #hud { flex-direction: column; }
-    #info { width: 100%; padding: 8px 12px; }
-    #goal { text-align: left; max-width: none; width: 100%; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    #goal br { display: none; }
-    .sep { display: inline; }
-    #goal #goalText { line-height: 1.4; }
-    #mute { margin-top: 0; flex-shrink: 0; }
-    .bars { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
-    button { font-size: 13px; padding: 8px 10px; }
+  @media (max-width: 640px) {
+    #repCard { width: auto; right: 8px; top: 76px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; padding: 7px 10px; }
+    #repCard .head { grid-column: 1 / -1; }
+    #homeActions { left: 0; right: 0; top: auto; bottom: 70px; width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; padding: 0 8px; }
+    #homeActions button { font-size: 13px; padding: 7px 9px; }
+    .chip { font-size: 12px; padding: 4px 9px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+    .slot { width: 120px; min-height: 130px; }
+    .slot img { width: 100px; height: 80px; }
+    #sheet { top: 76px; }
+    #title h1 { font-size: 28px; }
+    #title ul { display: none; }
   }
 </style>
 </head>
-<body class="title">
+<body>
 <canvas id="c"></canvas>
 
-<div id="hud">
-  <div id="info" class="panel">
-    <div id="pname">피닉스</div>
-    <div id="pstage">새끼 불사조</div>
-    <div class="bars">
-      <div class="bar"><div class="lbl"><span>🍖 포만감</span><span id="vHunger"></span></div><div class="track"><div class="fill" id="bHunger" style="background:linear-gradient(90deg,#ff8a2a,#ffd04a)"></div></div></div>
-      <div class="bar"><div class="lbl"><span>😊 기분</span><span id="vJoy"></span></div><div class="track"><div class="fill" id="bJoy" style="background:linear-gradient(90deg,#ff5a8a,#ffb0c8)"></div></div></div>
-      <div class="bar"><div class="lbl"><span>⚡ 기력</span><span id="vEnergy"></span></div><div class="track"><div class="fill" id="bEnergy" style="background:linear-gradient(90deg,#3aa0ff,#9fe0ff)"></div></div></div>
-      <div class="bar"><div class="lbl"><span>🤝 신뢰</span><span id="vTrust"></span></div><div class="track"><div class="fill" id="bTrust" style="background:linear-gradient(90deg,#c84aff,#ffb347)"></div></div></div>
-    </div>
-  </div>
-  <div id="goal" class="panel">
-    <div id="goalText"></div>
-    <button id="mute">🔊 소리 켜짐</button>
-  </div>
+<div id="topbar" class="hidden">
+  <div class="chip">🔥 <b id="coins">0</b> 불씨</div>
+  <div class="chip">🏆 스테이지 <b id="bestStage">1</b></div>
+  <div class="chip">🐦 보관 <b id="owned">0</b> · ⚔️ 출전 <b id="partyN">0</b></div>
+  <div class="chip">📖 <b id="dexN">0</b>/100</div>
+  <button id="mute">🔊</button>
 </div>
 
-<div id="actions">
-  <button id="aFeed">🍖 먹이 주기</button>
+<div id="repCard" class="panel hidden">
+  <div class="head">
+    <div id="repName"></div>
+    <div id="repSub"></div>
+  </div>
+  <div class="bar"><div class="lbl"><span>경험치</span><span id="repExpT"></span></div><div class="track"><div class="fill" id="repExp" style="background:linear-gradient(90deg,#ff8a2a,#ffd04a)"></div></div></div>
+  <div class="bar"><div class="lbl"><span>🤝 유대</span><span id="repBondT"></span></div><div class="track"><div class="fill" id="repBond" style="background:linear-gradient(90deg,#c84aff,#ffb347)"></div></div></div>
+</div>
+
+<div id="homeActions" class="hidden">
   <button id="aPet">✋ 쓰다듬기</button>
+  <button id="aFeed">🍖 먹이 주기 (10🔥)</button>
   <button id="aBond">🎵 교감하기</button>
   <button id="aCatch">🔥 불씨 잡기</button>
-  <button id="aFly">🪽 비행 훈련</button>
-  <button id="aSleep">💤 재우기</button>
+  <button id="aEvolve" class="primary hidden">✨ 진화하기</button>
 </div>
 
-<div id="toast"></div>
+<nav id="nav" class="hidden">
+  <button data-tab="home" class="active"><span>🪺</span>둥지</button>
+  <button data-tab="storage"><span>📦</span>보관함</button>
+  <button data-tab="fusion"><span>🧬</span>합성</button>
+  <button data-tab="hatch"><span>🥚</span>부화</button>
+  <button data-tab="battle"><span>⚔️</span>전투</button>
+  <button data-tab="dex"><span>📖</span>도감</button>
+</nav>
 
-<div id="titleScreen" class="overlay">
-  <div class="card panel">
+<div id="sheet" class="hidden">
+  <div id="sheetHead"><h2 id="sheetTitle"></h2><div id="sheetTools"></div></div>
+  <div id="sheetBody"></div>
+</div>
+
+<div id="battleTop" class="hidden">
+  <div class="chip" id="bStage">⚔️ 스테이지 1</div>
+  <select id="bTactic" title="아군 전술">
+    <option value="adv">🔥 상성 우선</option>
+    <option value="weak">🎯 약한 적 집중</option>
+    <option value="strong">💥 강한 적 우선</option>
+  </select>
+  <button id="bSpeed" class="sp">▶ x1</button>
+  <button id="bRetreat">🏳 후퇴</button>
+</div>
+<div id="battleBottom" class="hidden">
+  <button id="ultBtn" disabled><div id="ultFill"></div><span>🔥 피닉스 폭풍</span></button>
+</div>
+
+<div id="title" class="overlay">
+  <div class="card">
     <h1>불사조 길들이기</h1>
-    <p>잿더미 속 둥지에서 깨어난 작은 불사조.<br>보살피고 교감해서 <b style="color:#ffb347">새끼 → 청년 → 어른</b>으로 키우고<br>완전히 길들여 보세요.</p>
+    <p>새끼 → 청년 → 어른으로 키우고, 100가지 빛깔의 불사조를 모아 AI와 겨루세요.</p>
     <ul>
-      <li><b>먹이·쓰다듬기</b>로 포만감과 기분을 채우세요. 신뢰가 낮으면 불을 뿜으며 거부할 수 있어요.</li>
-      <li><b>교감하기</b>: 줄어드는 고리가 금빛 원에 겹칠 때 클릭/스페이스!</li>
-      <li><b>불씨 잡기</b>: 그릇을 움직여 불씨를 받고 물방울은 피하세요.</li>
-      <li><b>비행 훈련</b>(청년부터): 클릭/스페이스로 날갯짓, 불의 고리를 통과하세요.</li>
-      <li>배고프거나 우울하게 방치하면 신뢰가 떨어지고, 0이 되면 떠나 버립니다.</li>
+      <li><b>둥지</b>: 대표 불사조를 쓰다듬고 먹이고 교감해 길들이기</li>
+      <li><b>진화</b>: 레벨 10에 청년, 25에 어른으로 진화</li>
+      <li><b>합성</b>: 두 불사조를 섞어 새로운 색과 높은 희귀도 노리기</li>
+      <li><b>부화</b>: 알을 부화해 100가지 색 중 하나 얻기</li>
+      <li><b>전투</b>: 출전 수 제한 없이 팀을 꾸려 AI와 자동 전투, 승리하면 야생 불사조 포획</li>
+      <li>보관함도 무제한입니다.</li>
     </ul>
-    <input id="nameInput" maxlength="10" placeholder="불사조 이름" value="피닉스">
     <div class="row">
       <button id="btnContinue" class="primary hidden">이어하기</button>
       <button id="btnNew" class="primary">새로 시작</button>
@@ -126,1465 +208,16 @@
 </div>
 
 <div id="modal" class="overlay hidden">
-  <div class="card panel">
+  <div class="card">
     <h2 id="mTitle"></h2>
     <div id="mBody"></div>
     <div class="row" id="mBtns"></div>
   </div>
 </div>
 
-<script>
-(() => {
-'use strict';
+<div id="toast"></div>
 
-// ================= utilities =================
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const lerp = (a, b, f) => a + (b - a) * f;
-const rand = (a, b) => a + Math.random() * (b - a);
-function rng(seed) {
-  return function () {
-    seed = (seed + 0x6D2B79F5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-const $ = (id) => document.getElementById(id);
-
-// ================= canvas =================
-const cv = $('c');
-const ctx = cv.getContext('2d');
-let W = 0, H = 0, DPR = 1, S = 1, PS = 1, PX = 0, PY = 0;
-const bgBack = document.createElement('canvas');
-const bgFront = document.createElement('canvas');
-
-function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1);
-  W = window.innerWidth; H = window.innerHeight;
-  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  S = Math.min(W / 900, H / 600);
-  PS = Math.min(W / 560, H / 640);
-  PX = W * (W < 620 ? 0.5 : 0.47);
-  PY = H * 0.74;
-  buildBackground();
-}
-
-// ================= palettes (change with each rebirth) =================
-const PALS = [
-  { name: '태양의 불꽃', core: '#fff7c2', mid: '#ffc53d', hot: '#ff6a13', edge: 'rgba(200,30,10,0)', body: ['#fff6c8', '#ffc94a', '#ff8a1e', '#c8400c'], glow: '255,140,40', beak: '#ffb02a' },
-  { name: '창공의 불꽃', core: '#effcff', mid: '#8fdcff', hot: '#2f7dff', edge: 'rgba(40,20,200,0)', body: ['#f2fbff', '#a6e2ff', '#4a90ff', '#1c3fa8'], glow: '90,170,255', beak: '#ffd36a' },
-  { name: '영혼의 불꽃', core: '#fcefff', mid: '#e698ff', hot: '#9a2aff', edge: 'rgba(120,0,160,0)', body: ['#fdf0ff', '#eab0ff', '#a54cff', '#5a1a9a'], glow: '190,110,255', beak: '#ffc06a' },
-];
-const pal = () => PALS[(st ? st.rebirths : 0) % PALS.length];
-
-// ================= background =================
-function ridge(g, baseY, amp, color, seed, step, x0 = 0, x1 = W) {
-  const r = rng(seed);
-  g.fillStyle = color;
-  g.beginPath();
-  g.moveTo(x0, H);
-  let y = baseY;
-  for (let x = x0; x <= x1 + step; x += step) {
-    y = clamp(y + (r() - 0.5) * amp, baseY - amp * 1.4, baseY + amp * 0.6);
-    g.lineTo(x, y);
-  }
-  g.lineTo(x1, H);
-  g.closePath();
-  g.fill();
-}
-
-function spire(g, x, w, topY, color, seed) {
-  const r = rng(seed);
-  g.fillStyle = color;
-  g.beginPath();
-  g.moveTo(x - w / 2, H);
-  const n = 9;
-  for (let i = 0; i <= n; i++) {
-    const f = i / n;
-    const px = x - w / 2 + w * f;
-    const peak = 1 - Math.abs(f - 0.5) * 2;
-    const py = H - (H - topY) * (0.35 + 0.65 * Math.pow(peak, 0.6)) + (r() - 0.5) * 30 * S;
-    g.lineTo(px, py);
-  }
-  g.lineTo(x + w / 2, H);
-  g.closePath();
-  g.fill();
-}
-
-function buildBackground() {
-  for (const c of [bgBack, bgFront]) { c.width = cv.width; c.height = cv.height; }
-  let g = bgBack.getContext('2d');
-  g.setTransform(DPR, 0, 0, DPR, 0, 0);
-
-  const sky = g.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#0a0c26');
-  sky.addColorStop(0.35, '#2b1d45');
-  sky.addColorStop(0.55, '#8a3f4a');
-  sky.addColorStop(0.68, '#e07a3a');
-  sky.addColorStop(1, '#3a1410');
-  g.fillStyle = sky; g.fillRect(0, 0, W, H);
-
-  const r = rng(7);
-  for (let i = 0; i < 160; i++) {
-    const x = r() * W, y = r() * H * 0.45;
-    g.fillStyle = `rgba(255,255,255,${0.2 + r() * 0.7 * (1 - y / (H * 0.45))})`;
-    g.fillRect(x, y, r() < 0.1 ? 2 : 1, r() < 0.1 ? 2 : 1);
-  }
-
-  const sun = g.createRadialGradient(W * 0.42, H * 0.56, 0, W * 0.42, H * 0.56, Math.max(W, H) * 0.5);
-  sun.addColorStop(0, 'rgba(255,230,160,0.95)');
-  sun.addColorStop(0.08, 'rgba(255,170,80,0.6)');
-  sun.addColorStop(0.4, 'rgba(255,110,50,0.15)');
-  sun.addColorStop(1, 'rgba(255,90,40,0)');
-  g.fillStyle = sun; g.fillRect(0, 0, W, H);
-
-  // clouds
-  for (let i = 0; i < 12; i++) {
-    const cx = r() * W, cy = H * (0.12 + r() * 0.3), rw = (120 + r() * 220) * S, rh = (14 + r() * 22) * S;
-    g.fillStyle = `rgba(30,18,40,${0.35 + r() * 0.3})`;
-    g.beginPath(); g.ellipse(cx, cy, rw, rh, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = 'rgba(255,140,90,0.10)';
-    g.beginPath(); g.ellipse(cx, cy + rh * 0.5, rw * 0.9, rh * 0.5, 0, 0, Math.PI * 2); g.fill();
-  }
-
-  ridge(g, H * 0.6, 40 * S, '#5a3348', 11, 18 * S);
-  ridge(g, H * 0.66, 50 * S, '#3a2232', 23, 22 * S);
-  // mid cliffs framing the waterfall
-  spire(g, W * 0.62, 150 * S, H * 0.44, '#2a1820', 31);
-  spire(g, W < 620 ? W * 0.98 : W * 0.8, 170 * S, H * 0.4, '#2a1820', 37);
-
-  // haze
-  const haze = g.createLinearGradient(0, H * 0.55, 0, H);
-  haze.addColorStop(0, 'rgba(255,120,60,0)');
-  haze.addColorStop(1, 'rgba(255,90,30,0.25)');
-  g.fillStyle = haze; g.fillRect(0, H * 0.55, W, H * 0.45);
-
-  // ---- front layer ----
-  g = bgFront.getContext('2d');
-  g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  g.clearRect(0, 0, W, H);
-  spire(g, W * 0.04, 200 * S, H * 0.05, '#1a1015', 41);
-  spire(g, W * 0.15, 140 * S, H * 0.22, '#1e1218', 43);
-  spire(g, W * 0.97, 220 * S, H * 0.18, '#1a1015', 47);
-  ridge(g, H * 0.86, 22 * S, '#160c10', 53, 16 * S);
-
-  // pedestal rock for the phoenix
-  const rw = 150 * PS;
-  const rr = rng(61);
-  g.fillStyle = '#24151a';
-  g.beginPath();
-  g.moveTo(PX - rw * 1.6, H);
-  g.lineTo(PX - rw * 1.15, PY + 40 * PS);
-  g.lineTo(PX - rw, PY + 6 * PS);
-  for (let i = 0; i <= 8; i++) g.lineTo(PX - rw + (rw * 2 * i) / 8, PY + (rr() - 0.3) * 8 * PS);
-  g.lineTo(PX + rw * 1.1, PY + 30 * PS);
-  g.lineTo(PX + rw * 1.5, H);
-  g.closePath();
-  g.fill();
-  g.save();
-  g.clip();
-  const rim = g.createLinearGradient(0, PY - 5 * PS, 0, PY + 40 * PS);
-  rim.addColorStop(0, 'rgba(255,150,70,0.55)');
-  rim.addColorStop(1, 'rgba(255,150,70,0)');
-  g.fillStyle = rim;
-  g.fillRect(PX - rw * 1.2, PY - 5 * PS, rw * 2.4, 45 * PS);
-  // cracks with lava light
-  g.strokeStyle = 'rgba(255,110,30,0.55)';
-  g.lineWidth = 2 * PS;
-  for (let i = 0; i < 5; i++) {
-    let x = PX + (rr() - 0.5) * rw * 2, y = PY + 30 * PS + rr() * 40 * PS;
-    g.beginPath(); g.moveTo(x, y);
-    for (let k = 0; k < 4; k++) { x += (rr() - 0.5) * 30 * PS; y += 15 * PS + rr() * 25 * PS; g.lineTo(x, y); }
-    g.stroke();
-  }
-  g.restore();
-
-  // lava glow at the bottom
-  const lava = g.createLinearGradient(0, H * 0.82, 0, H);
-  lava.addColorStop(0, 'rgba(255,90,20,0)');
-  lava.addColorStop(1, 'rgba(255,90,20,0.45)');
-  g.fillStyle = lava; g.fillRect(0, H * 0.82, W, H * 0.18);
-}
-
-function drawWaterfall(t) {
-  const x = W < 620 ? W * 0.9 : W * 0.705, w = 22 * S, top = H * 0.5, bot = H * 0.8;
-  const gr = ctx.createLinearGradient(0, top, 0, bot);
-  gr.addColorStop(0, 'rgba(220,235,255,0.85)');
-  gr.addColorStop(1, 'rgba(255,200,170,0.5)');
-  ctx.fillStyle = gr;
-  ctx.fillRect(x - w / 2, top, w, bot - top);
-  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 6; i++) {
-    const px = x - w / 2 + (w * (i + 0.5)) / 6;
-    const off = ((t * 120 * S + i * 37) % (40 * S));
-    ctx.setLineDash([12 * S, 28 * S]);
-    ctx.lineDashOffset = -off;
-    ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, bot); ctx.stroke();
-  }
-  ctx.setLineDash([]);
-  const mist = ctx.createRadialGradient(x, bot, 0, x, bot, 50 * S);
-  mist.addColorStop(0, 'rgba(255,240,230,0.5)');
-  mist.addColorStop(1, 'rgba(255,240,230,0)');
-  ctx.fillStyle = mist;
-  ctx.beginPath(); ctx.arc(x, bot, 50 * S, 0, Math.PI * 2); ctx.fill();
-}
-
-function drawLavaFlames(t) {
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 14; i++) {
-    const x = (i / 13) * W + Math.sin(i * 7.3) * 30;
-    const h = (30 + 25 * Math.sin(t * 3 + i * 1.7) + 15 * Math.sin(t * 7.1 + i)) * S;
-    const gr = ctx.createLinearGradient(0, H, 0, H - h);
-    gr.addColorStop(0, 'rgba(255,120,30,0.5)');
-    gr.addColorStop(1, 'rgba(255,60,10,0)');
-    ctx.fillStyle = gr;
-    ctx.beginPath();
-    ctx.moveTo(x - 30 * S, H);
-    ctx.quadraticCurveTo(x - 10 * S, H - h * 0.6, x + Math.sin(t * 4 + i) * 8 * S, H - h);
-    ctx.quadraticCurveTo(x + 12 * S, H - h * 0.5, x + 30 * S, H);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-// ================= phoenix drawing =================
-function feather(len, w, wob, p, alpha) {
-  const gr = ctx.createLinearGradient(0, 0, len, 0);
-  gr.addColorStop(0, p.core);
-  gr.addColorStop(0.35, p.mid);
-  gr.addColorStop(0.72, p.hot);
-  gr.addColorStop(1, p.edge);
-  ctx.fillStyle = gr;
-  ctx.globalAlpha = alpha;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.bezierCurveTo(len * 0.3, -w, len * 0.75, -w * 0.6 + wob, len, wob * 1.6);
-  ctx.bezierCurveTo(len * 0.7, w * 0.5 + wob, len * 0.3, w, 0, 0);
-  ctx.fill();
-}
-
-function featherAt(x, y, a, len, w, wob, p) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(a);
-  feather(len, w, wob, p, 1);
-  ctx.globalCompositeOperation = 'lighter';
-  feather(len * 1.06, w * 1.5, wob, p, 0.22);
-  ctx.restore();
-}
-
-function glow(x, y, r, p, a) {
-  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, `rgba(${p.glow},${a})`);
-  g.addColorStop(1, `rgba(${p.glow},0)`);
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-}
-
-function wing(side, sx, sy, P, k, armA, fa0, fa1, lmul, flap, t, p) {
-  ctx.save();
-  ctx.scale(side, 1);
-  ctx.translate(sx, sy);
-  ctx.rotate(flap);
-  const n = P.wn, aL = P.armL * k;
-  const ax = Math.cos(armA) * aL, ay = Math.sin(armA) * aL;
-  // flight feathers rooted along the arm: short & drooping near the body, long & raised at the tip
-  for (let i = 0; i < n; i++) {
-    const f = i / (n - 1);
-    const L = lerp(P.wl0, P.wl1 * lmul, Math.pow(f, 0.8));
-    featherAt(ax * f * 0.95, ay * f * 0.95, lerp(fa0, fa1, f), L, P.ww, Math.sin(t * 6 + i * 1.3) * L * 0.05, p);
-  }
-  // arm
-  ctx.strokeStyle = p.body[1];
-  ctx.lineWidth = 12 * k;
-  ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(ax * 0.9, ay * 0.9); ctx.stroke();
-  // coverts
-  const m = Math.ceil(n * 0.7);
-  for (let i = 0; i < m; i++) {
-    const f = i / (m - 1);
-    featherAt(ax * f * 0.8, ay * f * 0.8, lerp(fa0, fa1, f) + 0.3, lerp(P.wl0, P.wl1, f) * 0.4, P.ww * 1.1, Math.sin(t * 5 + i) * 2, p);
-  }
-  ctx.restore();
-}
-
-const BIRD = [null,
-  { k: 1, bodyRx: 30, bodyRy: 44, bodyY: -80, legH: 40, headX: 10, headY: -140, headR: 19, shX: 16, shY: -104,
-    wn: 9, armL: 58, armA: -0.6, fa0: 0.85, fa1: -1.15, wl0: 40, wl1: 120, ww: 13, tn: 5, tl0: 55, tl1: 100, crest: 3, flapA: 0.16, flapS: 3.0 },
-  { k: 1.3, bodyRx: 30, bodyRy: 44, bodyY: -80, legH: 40, headX: 10, headY: -140, headR: 19, shX: 16, shY: -104,
-    wn: 12, armL: 62, armA: -0.65, fa0: 0.9, fa1: -1.2, wl0: 50, wl1: 165, ww: 15, tn: 7, tl0: 70, tl1: 150, crest: 5, flapA: 0.11, flapS: 2.0 },
-];
-
-function drawBird(P, p, o) {
-  const k = P.k, t = o.t;
-  const bY = P.bodyY * k, bRx = P.bodyRx * k, bRy = P.bodyRy * k;
-  const hx = P.headX * k, hy = P.headY * k, hr = P.headR * k;
-  const shX = P.shX * k, shY = P.shY * k;
-  const angry = o.mood === 'angry';
-
-  glow(0, bY - 20 * k, (angry ? 260 : 190) * k, p, angry ? 0.55 : 0.32);
-
-  let fl = Math.sin(t * P.flapS * (o.flapBoost || 1)) * P.flapA * (o.flapBoost || 1);
-  let armA = P.armA, fa0 = P.fa0, fa1 = P.fa1;
-  if (o.sleep) { armA = 1.0; fa0 = 1.75; fa1 = 1.25; fl = Math.sin(t * 1.2) * 0.03; }
-  if (o.flying) { armA = -0.2; fa0 = 0.8; fa1 = -0.45; fl = o.flap; }
-  if (angry) { armA -= 0.25; fa1 -= 0.15; fl += Math.sin(t * 30) * 0.05; }
-
-  // tail
-  const tailBase = o.flying ? Math.PI : 2.05;
-  const tailSpread = o.flying ? 0.5 : 0.75;
-  for (let i = 0; i < P.tn; i++) {
-    const f = i / (P.tn - 1);
-    const a = tailBase - tailSpread / 2 + tailSpread * f + Math.sin(t * 2 + i) * 0.05;
-    const L = lerp(P.tl0, P.tl1, Math.sin(Math.PI * f));
-    featherAt(-bRx * 0.3, bY + bRy * 0.55, a, L, 11 * k, Math.sin(t * 4 + i * 2) * 6, p);
-  }
-
-  // wings (behind body)
-  const lm = angry ? 1.12 : 1;
-  wing(-1, shX, shY, P, k, armA, fa0, fa1, lm, fl, t, p);
-  wing(1, shX, shY, P, k, armA, fa0, fa1, lm, fl, t + 0.3, p);
-
-  // legs
-  if (!o.flying) {
-    ctx.strokeStyle = '#c86a1a';
-    ctx.lineWidth = 4 * k;
-    ctx.lineCap = 'round';
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(s * 9 * k, bY + bRy * 0.8);
-      ctx.lineTo(s * 10 * k, 0);
-      ctx.stroke();
-      ctx.lineWidth = 3 * k;
-      for (const ta of [-0.4, 0, 0.4]) {
-        ctx.beginPath(); ctx.moveTo(s * 10 * k, 0);
-        ctx.lineTo(s * 10 * k + Math.sin(ta + 0.6) * 11 * k, Math.cos(ta + 0.6) * 2 * k);
-        ctx.stroke();
-      }
-      ctx.lineWidth = 4 * k;
-    }
-  }
-
-  // body
-  const bg = ctx.createRadialGradient(-bRx * 0.3, bY - bRy * 0.4, 2, 0, bY, bRy * 1.2);
-  bg.addColorStop(0, p.body[0]);
-  bg.addColorStop(0.35, p.body[1]);
-  bg.addColorStop(0.75, p.body[2]);
-  bg.addColorStop(1, p.body[3]);
-  ctx.fillStyle = bg;
-  ctx.beginPath(); ctx.ellipse(0, bY, bRx, bRy, 0.12, 0, Math.PI * 2); ctx.fill();
-  // breast scallops
-  ctx.strokeStyle = 'rgba(255,255,230,0.35)';
-  ctx.lineWidth = 1.5 * k;
-  for (let r = 0; r < 4; r++) for (let c = -1; c <= 1; c++) {
-    const x = c * 10 * k + (r % 2) * 5 * k, y = bY - bRy * 0.3 + r * 11 * k;
-    ctx.beginPath(); ctx.arc(x, y, 6 * k, 0.2, Math.PI - 0.2); ctx.stroke();
-  }
-
-  // neck + head
-  const bob = o.sleep ? 14 * k : (o.eat ? Math.abs(Math.sin(t * 14)) * 10 * k : Math.sin(t * 2) * 2 * k);
-  const HX = hx + (o.sleep ? -6 * k : 0), HY = hy + bob;
-  ctx.fillStyle = p.body[1];
-  ctx.beginPath();
-  ctx.moveTo(-bRx * 0.55, bY - bRy * 0.6);
-  ctx.quadraticCurveTo(HX - hr, (HY + bY) / 2, HX - hr * 0.6, HY + hr * 0.3);
-  ctx.lineTo(HX + hr * 0.7, HY + hr * 0.5);
-  ctx.quadraticCurveTo(hx + hr * 0.2, (HY + bY) / 2, bRx * 0.6, bY - bRy * 0.55);
-  ctx.closePath(); ctx.fill();
-
-  // crest
-  for (let i = 0; i < P.crest; i++) {
-    const f = P.crest === 1 ? 0.5 : i / (P.crest - 1);
-    const a = lerp(-2.6, -1.45, f) + Math.sin(t * 5 + i) * 0.08;
-    featherAt(HX - hr * 0.3, HY - hr * 0.6, a, lerp(55, 30, f) * k * (angry ? 1.3 : 1), 7 * k, Math.sin(t * 7 + i) * 3, p);
-  }
-
-  const hg = ctx.createRadialGradient(HX - hr * 0.3, HY - hr * 0.4, 1, HX, HY, hr * 1.2);
-  hg.addColorStop(0, p.body[0]);
-  hg.addColorStop(0.6, p.body[1]);
-  hg.addColorStop(1, p.body[2]);
-  ctx.fillStyle = hg;
-  ctx.beginPath(); ctx.arc(HX, HY, hr, 0, Math.PI * 2); ctx.fill();
-
-  // beak (hooked, facing right)
-  ctx.fillStyle = p.beak;
-  ctx.beginPath();
-  ctx.moveTo(HX + hr * 0.7, HY - hr * 0.35);
-  ctx.quadraticCurveTo(HX + hr * 1.9, HY - hr * 0.3, HX + hr * 1.75, HY + hr * 0.45);
-  ctx.quadraticCurveTo(HX + hr * 1.4, HY + hr * 0.1, HX + hr * 0.75, HY + hr * 0.35);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = 'rgba(80,30,0,0.6)';
-  ctx.beginPath(); ctx.arc(HX + hr * 1.68, HY + hr * 0.35, hr * 0.12, 0, Math.PI * 2); ctx.fill();
-
-  // eye
-  const ex = HX + hr * 0.35, ey = HY - hr * 0.15;
-  if (o.sleep || o.blink > 0.6) {
-    ctx.strokeStyle = '#3a1000'; ctx.lineWidth = 2 * k;
-    ctx.beginPath(); ctx.arc(ex, ey, hr * 0.22, 0.2, Math.PI - 0.2); ctx.stroke();
-  } else {
-    ctx.fillStyle = '#fff8e0';
-    ctx.beginPath(); ctx.ellipse(ex, ey, hr * 0.3, hr * 0.24, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = angry ? '#a00' : '#2a0a00';
-    ctx.beginPath(); ctx.arc(ex + hr * 0.06, ey, hr * 0.17, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(ex + hr * 0.12, ey - hr * 0.07, hr * 0.06, 0, Math.PI * 2); ctx.fill();
-    // brow
-    ctx.strokeStyle = 'rgba(120,30,0,0.8)'; ctx.lineWidth = 2 * k;
-    ctx.beginPath();
-    ctx.moveTo(ex - hr * 0.35, ey - hr * (angry ? 0.45 : 0.35));
-    ctx.lineTo(ex + hr * 0.35, ey - hr * (angry ? 0.2 : 0.38));
-    ctx.stroke();
-  }
-}
-
-const nestSticks = (() => {
-  const r = rng(99), a = [];
-  for (let i = 0; i < 26; i++) a.push([r() * 2 - 1, r() * 2 - 1, r() * Math.PI, 0.6 + r() * 0.6]);
-  return a;
-})();
-
-function drawNest(t) {
-  ctx.fillStyle = '#3a2214';
-  ctx.beginPath(); ctx.ellipse(0, -4, 80, 22, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.lineCap = 'round';
-  for (const [x, y, a, l] of nestSticks) {
-    ctx.strokeStyle = y > 0 ? '#5a3a20' : '#6e4a2a';
-    ctx.lineWidth = 3;
-    const cx = x * 70, cy = -4 + y * 16, L = 40 * l;
-    ctx.beginPath();
-    ctx.moveTo(cx - Math.cos(a) * L / 2, cy - Math.sin(a) * L * 0.15);
-    ctx.lineTo(cx + Math.cos(a) * L / 2, cy + Math.sin(a) * L * 0.15);
-    ctx.stroke();
-  }
-  // embers in nest
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 6; i++) {
-    const x = Math.sin(i * 3.1) * 55, y = -2 + Math.cos(i * 2.3) * 8;
-    ctx.fillStyle = `rgba(255,${120 + 60 * Math.sin(t * 4 + i)},40,0.7)`;
-    ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawFrontNest() {
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 10; i++) {
-    const [x, , a, l] = nestSticks[i];
-    ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 3.5;
-    const cx = x * 60, cy = 8 + Math.abs(x) * -4, L = 46 * l;
-    ctx.beginPath();
-    ctx.moveTo(cx - Math.cos(a) * L / 2, cy - 3);
-    ctx.lineTo(cx + Math.cos(a) * L / 2, cy + 3);
-    ctx.stroke();
-  }
-}
-
-function drawChick(p, o) {
-  const t = o.t;
-  const angry = o.mood === 'angry';
-  glow(0, -55, angry ? 170 : 130, p, angry ? 0.55 : 0.32);
-  drawNest(t);
-
-  const fl = o.sleep ? 0 : Math.sin(t * (o.flapBoost > 1 ? 18 : 4)) * (o.flapBoost > 1 ? 0.4 : 0.1);
-  for (const side of [-1, 1]) {
-    ctx.save();
-    ctx.scale(side, 1);
-    ctx.translate(34, -62);
-    ctx.rotate(-fl + (o.sleep ? 0.9 : 0));
-    for (let i = 4; i >= 0; i--) {
-      const f = i / 4;
-      featherAt(0, 0, lerp(-1.75, -0.3, f), lerp(52, 30, f) * (angry ? 1.2 : 1), 10, Math.sin(t * 6 + i) * 2, p);
-    }
-    ctx.restore();
-  }
-
-  // head tuft
-  for (let i = 0; i < 3; i++) {
-    const a = [-2.0, -1.57, -1.15][i] + Math.sin(t * 5 + i) * 0.1;
-    featherAt(0, -92, a, [22, 32, 22][i] * (angry ? 1.4 : 1), 7, Math.sin(t * 7 + i) * 2, p);
-  }
-
-  const bob = o.eat ? Math.abs(Math.sin(t * 14)) * 6 : 0;
-  ctx.translate(0, bob);
-  const bg = ctx.createRadialGradient(-14, -76, 3, 0, -52, 52);
-  bg.addColorStop(0, p.body[0]);
-  bg.addColorStop(0.45, p.body[1]);
-  bg.addColorStop(0.85, p.body[2]);
-  bg.addColorStop(1, p.body[3]);
-  // fluffy edge
-  ctx.fillStyle = p.body[2];
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
-    ctx.beginPath(); ctx.arc(Math.cos(a) * 43, -52 + Math.sin(a) * 43, 7, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.fillStyle = bg;
-  ctx.beginPath(); ctx.arc(0, -52, 46, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,230,0.45)';
-  ctx.beginPath(); ctx.ellipse(0, -36, 24, 18, 0, 0, Math.PI * 2); ctx.fill();
-
-  // eyes
-  for (const s of [-1, 1]) {
-    const ex = s * 16, ey = -62;
-    if (o.sleep || o.blink > 0.6) {
-      ctx.strokeStyle = '#3a1000'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(ex, ey, 7, 0.2, Math.PI - 0.2); ctx.stroke();
-    } else {
-      ctx.fillStyle = '#1a0800';
-      ctx.beginPath(); ctx.ellipse(ex, ey, 9, 11, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(ex + 3, ey - 4, 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(ex - 3, ey + 4, 1.6, 0, Math.PI * 2); ctx.fill();
-      if (angry) {
-        ctx.strokeStyle = '#6a1000'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(ex - s * 10, ey - 16); ctx.lineTo(ex + s * 6, ey - 10); ctx.stroke();
-      }
-    }
-  }
-  // cheeks
-  ctx.fillStyle = 'rgba(255,100,90,0.35)';
-  ctx.beginPath(); ctx.ellipse(-28, -48, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(28, -48, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
-  // beak
-  ctx.fillStyle = p.beak;
-  ctx.beginPath();
-  if (o.eat || angry) { ctx.moveTo(-6, -52); ctx.lineTo(6, -52); ctx.lineTo(0, -40); ctx.moveTo(-6, -50); ctx.lineTo(6, -50); ctx.lineTo(0, -55); }
-  else { ctx.moveTo(-6, -52); ctx.lineTo(6, -52); ctx.lineTo(0, -43); }
-  ctx.fill();
-  ctx.translate(0, -bob);
-  drawFrontNest();
-}
-
-function drawPhoenix(x, y, stage, scale, o) {
-  ctx.save();
-  ctx.translate(x, y);
-  if (o.shake) ctx.translate(Math.sin(o.t * 60) * o.shake, 0);
-  ctx.scale(scale, scale);
-  if (stage === 0) drawChick(pal(), o);
-  else drawBird(BIRD[stage], pal(), o);
-  ctx.restore();
-}
-
-// head position (screen coords) for bubbles & bonding ring
-function headPos() {
-  const sc = PS * stageScale();
-  if (st.stage === 0) return [PX, PY + (-60 + jump()) * sc];
-  const P = BIRD[st.stage];
-  return [PX + P.headX * P.k * sc, PY + P.headY * P.k * sc + jump() * sc];
-}
-function bodyPos() {
-  const sc = PS * stageScale();
-  if (st.stage === 0) return [PX, PY - 52 * sc, 60 * sc];
-  const P = BIRD[st.stage];
-  return [PX, PY + (P.bodyY - 20) * P.k * sc, 75 * P.k * sc];
-}
-const stageScale = () => [1.25, 1, 1][st.stage];
-
-// ================= particles =================
-let parts = [];
-function emit(x, y, n, opt = {}) {
-  for (let i = 0; i < n; i++) {
-    const a = opt.angle !== undefined ? opt.angle + rand(-opt.spread, opt.spread) : rand(0, Math.PI * 2);
-    const sp = rand(opt.smin || 20, opt.smax || 120) * S;
-    parts.push({
-      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-      life: 0, max: rand(opt.lmin || 0.6, opt.lmax || 1.4),
-      size: rand(opt.rmin || 1.5, opt.rmax || 4) * S,
-      kind: opt.kind || 'ember', color: opt.color, rise: opt.rise ?? 60, text: opt.text,
-    });
-  }
-}
-function floatText(x, y, text, color = '#ffe08a') {
-  parts.push({ x, y, vx: 0, vy: -50 * S, life: 0, max: 1.3, size: 18 * S, kind: 'text', text, color, rise: 0 });
-}
-function updateParts(dt) {
-  for (const p of parts) {
-    p.life += dt;
-    p.x += p.vx * dt; p.y += p.vy * dt;
-    p.vy -= p.rise * S * dt;
-    p.vx *= 1 - 1.2 * dt;
-    if (p.kind === 'ember') p.x += Math.sin(p.life * 6 + p.size) * 20 * S * dt;
-  }
-  parts = parts.filter((p) => p.life < p.max);
-}
-function heartPath(x, y, s) {
-  ctx.beginPath();
-  ctx.moveTo(x, y + s * 0.3);
-  ctx.bezierCurveTo(x - s, y - s * 0.4, x - s * 0.5, y - s, x, y - s * 0.45);
-  ctx.bezierCurveTo(x + s * 0.5, y - s, x + s, y - s * 0.4, x, y + s * 0.3);
-}
-function drawParts() {
-  const p0 = pal();
-  for (const p of parts) {
-    const f = 1 - p.life / p.max;
-    if (p.kind === 'text') {
-      ctx.globalAlpha = Math.min(1, f * 2);
-      ctx.font = `700 ${p.size}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#000';
-      ctx.fillText(p.text, p.x + 1.5, p.y + 1.5);
-      ctx.fillStyle = p.color;
-      ctx.fillText(p.text, p.x, p.y);
-    } else if (p.kind === 'heart') {
-      ctx.globalAlpha = f;
-      ctx.fillStyle = '#ff6a9a';
-      heartPath(p.x, p.y, p.size * 3);
-      ctx.fill();
-    } else if (p.kind === 'z') {
-      ctx.globalAlpha = f;
-      ctx.font = `700 ${p.size * 5}px sans-serif`;
-      ctx.fillStyle = '#cfe0ff';
-      ctx.fillText('z', p.x, p.y);
-    } else {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = f;
-      ctx.fillStyle = p.color || (f > 0.6 ? p0.core : f > 0.3 ? p0.mid : p0.hot);
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + f * 0.6), 0, Math.PI * 2); ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
-    }
-  }
-  ctx.globalAlpha = 1;
-}
-
-let ambient = [];
-function updateAmbient(dt) {
-  if (ambient.length < 70 && Math.random() < dt * 25) {
-    ambient.push({ x: rand(0, W), y: H + 5, vy: -rand(20, 70) * S, s: rand(0.8, 2.4) * S, ph: rand(0, 6), life: 0, max: rand(4, 9) });
-  }
-  for (const a of ambient) { a.life += dt; a.y += a.vy * dt; a.x += Math.sin(a.life * 1.5 + a.ph) * 15 * S * dt; }
-  ambient = ambient.filter((a) => a.life < a.max && a.y > -10);
-}
-function drawAmbient() {
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const a of ambient) {
-    ctx.globalAlpha = Math.min(1, (1 - a.life / a.max) * 1.5) * 0.8;
-    ctx.fillStyle = '#ff9a3a';
-    ctx.beginPath(); ctx.arc(a.x, a.y, a.s, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-}
-
-// ================= audio =================
-let AC = null, muted = false;
-function tone(freq, dur, type = 'sine', vol = 0.12, slide = 0, delay = 0) {
-  if (muted) return;
-  try {
-    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
-    const t0 = AC.currentTime + delay;
-    const o = AC.createOscillator(), g = AC.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(freq, t0);
-    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t0 + dur);
-    g.gain.setValueAtTime(vol, t0);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(AC.destination);
-    o.start(t0); o.stop(t0 + dur + 0.02);
-  } catch (e) { /* audio unavailable */ }
-}
-const SFX = {
-  chirp() { const b = [1500, 900, 600][st.stage]; tone(b, 0.09, 'triangle', 0.1, b * 0.5); tone(b * 1.2, 0.12, 'triangle', 0.1, b * 0.4, 0.1); },
-  eat() { tone(300, 0.08, 'square', 0.06, -100); tone(380, 0.08, 'square', 0.06, -100, 0.1); },
-  hiss() { tone(220, 0.35, 'sawtooth', 0.08, -150); },
-  good() { tone(660, 0.1, 'triangle', 0.1); tone(880, 0.14, 'triangle', 0.1, 0, 0.08); },
-  perfect() { tone(880, 0.1, 'triangle', 0.12); tone(1175, 0.1, 'triangle', 0.12, 0, 0.08); tone(1760, 0.18, 'triangle', 0.1, 0, 0.16); },
-  miss() { tone(200, 0.2, 'square', 0.06, -80); },
-  pick() { tone(990, 0.06, 'sine', 0.1, 400); },
-  splash() { tone(400, 0.25, 'sine', 0.1, -300); },
-  flap() { tone(160, 0.08, 'triangle', 0.08, 120); },
-  evolve() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.35, 'triangle', 0.1, 0, i * 0.14)); },
-  crash() { tone(120, 0.4, 'sawtooth', 0.1, -80); },
-};
-
-// ================= state =================
-const SAVE_KEY = 'phoenix-taming-v1';
-const STAGE_NAMES = ['새끼 불사조', '청년 불사조', '어른 불사조'];
-const GOALS = [{ xp: 120, trust: 45 }, { xp: 400, trust: 75 }, { xp: Infinity, trust: 100 }];
-const newState = (name, rebirths = 0) => ({
-  name, stage: 0, xp: 0, hunger: 70, joy: 60, energy: 80, trust: rebirths > 0 ? 40 : 25,
-  rebirths, tamed: false, playTime: 0,
-});
-let st = null;
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(st)); } catch (e) { /* storage unavailable */ } }
-function load() {
-  try {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && typeof s.stage === 'number') return s;
-  } catch (e) { /* ignore */ }
-  return null;
-}
-function clampStats() {
-  for (const k of ['hunger', 'joy', 'energy', 'trust']) st[k] = clamp(st[k], 0, 100);
-}
-
-let mode = 'title';
-let T = 0;
-const phx = { anim: 'idle', animT: 0, blink: 0, blinkT: 3, sleeping: 0 };
-const cd = {};
-let bubble = null;
-let chatterT = 6;
-let evo = null;
-let paused = false;
-let saveT = 0, hudT = 0;
-let night = 0;
-
-function setAnim(a, d) { phx.anim = a; phx.animT = d; }
-function say(text, d = 2.2) { bubble = { text, t: d }; }
-function jump() { return phx.anim === 'happy' ? -Math.abs(Math.sin(T * 10)) * 14 : 0; }
-
-// ================= UI =================
-let toastTimer = 0;
-function toast(msg, d = 2) {
-  const el = $('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  toastTimer = d;
-}
-
-function showModal(title, html, buttons) {
-  paused = true;
-  $('mTitle').textContent = title;
-  $('mBody').innerHTML = html;
-  const box = $('mBtns');
-  box.innerHTML = '';
-  for (const b of buttons) {
-    const el = document.createElement('button');
-    el.textContent = b.label;
-    if (b.primary) el.className = 'primary';
-    el.onclick = () => { $('modal').classList.add('hidden'); paused = false; b.fn && b.fn(); };
-    box.appendChild(el);
-  }
-  $('modal').classList.remove('hidden');
-}
-
-function updateHUD() {
-  $('pname').textContent = st.name;
-  let stageTxt = STAGE_NAMES[st.stage];
-  if (st.tamed) stageTxt += ' · 완전히 길들여짐';
-  if (st.rebirths > 0) stageTxt += ` · 환생 ${st.rebirths}회 (${pal().name})`;
-  $('pstage').textContent = stageTxt;
-  for (const [k, id] of [['hunger', 'Hunger'], ['joy', 'Joy'], ['energy', 'Energy'], ['trust', 'Trust']]) {
-    $('b' + id).style.width = st[k].toFixed(1) + '%';
-    $('v' + id).textContent = Math.floor(st[k]);
-  }
-  const g = GOALS[st.stage];
-  let html;
-  if (st.stage < 2) {
-    html = `<b>${STAGE_NAMES[st.stage + 1]}</b>(으)로 성장하려면 <br>` +
-      `경험치 ${Math.floor(st.xp)} / ${g.xp} ${st.xp >= g.xp ? '✅' : ''}<span class="sep"> · </span><br>` +
-      `신뢰 ${Math.floor(st.trust)} / ${g.trust} ${st.trust >= g.trust ? '✅' : ''}`;
-  } else if (!st.tamed) {
-    html = `<b>완전히 길들이기</b> <br>신뢰 ${Math.floor(st.trust)} / 100`;
-  } else {
-    html = `<b>${st.name}</b>은(는) 당신의<br>영원한 동반자입니다 🔥`;
-  }
-  $('goalText').innerHTML = html;
-
-  const busy = mode !== 'home' || phx.sleeping > 0 || evo || paused;
-  $('aFeed').disabled = busy;
-  $('aPet').disabled = busy;
-  $('aBond').disabled = busy;
-  $('aCatch').disabled = busy;
-  $('aSleep').disabled = busy;
-  $('aFly').disabled = busy || st.stage < 1;
-  $('aFly').textContent = st.stage < 1 ? '🪽 비행 훈련 (청년부터)' : '🪽 비행 훈련';
-}
-
-function gain(dict, x, y) {
-  const labels = { hunger: '포만감', joy: '기분', energy: '기력', trust: '신뢰', xp: '경험치' };
-  let i = 0;
-  for (const [k, v] of Object.entries(dict)) {
-    if (!v) continue;
-    st[k] += v;
-    if (x !== undefined) floatText(x + (i % 2 ? 40 : -40) * S, y - i * 22 * S, `${labels[k]} ${v > 0 ? '+' : ''}${Math.round(v)}`, v > 0 ? '#ffe08a' : '#ff8a8a');
-    i++;
-  }
-  clampStats();
-}
-
-// ================= home actions =================
-function ready(name, t) {
-  if ((cd[name] || 0) > T) return false;
-  cd[name] = T + t;
-  return true;
-}
-function needEnergy(n) {
-  if (st.energy >= n) return true;
-  say(['삐...', '끄응...', '하아...'][st.stage]);
-  toast('너무 지쳤어요. 먼저 재워 주세요 💤');
-  return false;
-}
-
-function actFeed() {
-  if (!ready('feed', 1.6)) return;
-  const [hx, hy] = headPos();
-  if (st.hunger > 92) {
-    say('배불러!');
-    gain({ joy: -3 }, hx, hy);
-    return;
-  }
-  setAnim('eat', 1.2);
-  emit(hx + 20 * S, hy, 14, { kind: 'ember', smin: 40, smax: 160, rise: 40 });
-  SFX.eat();
-  gain({ hunger: 22, xp: 3, trust: 1 }, hx, hy - 30 * S);
-  say(['냠냠!', '쩝쩝', '크르릉…♪'][st.stage], 1.4);
-}
-
-function actPet() {
-  if (!ready('pet', 0.7)) return;
-  const [bx, by] = bodyPos();
-  const refuse = clamp(0.55 - st.trust / 70, 0, 0.5) + (st.joy < 20 ? 0.2 : 0) + (st.hunger < 15 ? 0.2 : 0);
-  if (Math.random() < refuse) {
-    setAnim('angry', 1.2);
-    SFX.hiss();
-    emit(bx, by, 40, { smin: 120, smax: 320, rise: 10, rmax: 5 });
-    say(['삐익! 쉿!', '쉬이익—!', '크아아아!'][st.stage]);
-    toast('앗 뜨거워! 아직 경계하고 있어요 🔥');
-    gain({ joy: -2 }, bx, by - 60 * S);
-    return;
-  }
-  setAnim('happy', 1.0);
-  SFX.chirp();
-  for (let i = 0; i < 4; i++) emit(bx + rand(-40, 40) * S, by - 30 * S, 1, { kind: 'heart', angle: -Math.PI / 2, spread: 0.4, smin: 40, smax: 80, rise: 0, lmin: 1, lmax: 1.5, rmin: 3, rmax: 4 });
-  gain({ joy: 5, trust: 1.5, xp: 1 }, bx, by - 70 * S);
-  if (Math.random() < 0.5) say(['삐약♪', '키릭♪', '구르르…'][st.stage], 1.2);
-}
-
-function actSleep() {
-  phx.sleeping = 4;
-  say('Zzz…', 1.5);
-  toast(`${st.name}이(가) 잠들었어요…`);
-}
-
-function finishSleep() {
-  const [hx, hy] = headPos();
-  gain({ energy: 55, hunger: -12, joy: 4 }, hx, hy - 20 * S);
-  say(['삐약! 잘 잤다!', '개운해!', '끼이이—!'][st.stage]);
-  SFX.chirp();
-}
-
-// ================= bonding (rhythm) =================
-let rh = null;
-function startBond() {
-  if (!needEnergy(10)) return;
-  st.energy -= 10;
-  mode = 'rhythm';
-  rh = { round: 0, total: 6, r: 0, phase: 'wait', wait: 0.8, res: [], judge: null, judgeT: 0 };
-  toast('고리가 금빛 원에 겹칠 때 클릭 / 스페이스!', 2.2);
-}
-function rhTarget() { return 62 * PS; }
-function rhSpeed() { return rhTarget() * (1.7 + st.stage * 0.45 + rh.round * 0.08); }
-function updateRhythm(dt) {
-  if (rh.judgeT > 0) rh.judgeT -= dt;
-  if (rh.phase === 'wait') {
-    rh.wait -= dt;
-    if (rh.wait <= 0) {
-      if (rh.round >= rh.total) return endBond();
-      rh.phase = 'ring';
-      rh.r = rhTarget() * 3.2;
-    }
-  } else if (rh.phase === 'ring') {
-    rh.r -= rhSpeed() * dt;
-    if (rh.r < rhTarget() - 26 * PS) judgeRing(true);
-  }
-}
-function judgeRing(timeout) {
-  if (rh.phase !== 'ring') return;
-  const d = Math.abs(rh.r - rhTarget());
-  let j = 'MISS';
-  if (!timeout) j = d < 8 * PS ? 'PERFECT' : d < 20 * PS ? 'GOOD' : 'MISS';
-  rh.res.push(j);
-  rh.judge = j; rh.judgeT = 0.6;
-  rh.phase = 'wait'; rh.wait = 0.5; rh.round++;
-  const [hx, hy] = headPos();
-  if (j === 'PERFECT') { SFX.perfect(); emit(hx, hy, 30, { smin: 80, smax: 220, rise: 20 }); setAnim('happy', 0.6); }
-  else if (j === 'GOOD') { SFX.good(); emit(hx, hy, 12, { smin: 60, smax: 140 }); }
-  else { SFX.miss(); }
-}
-function endBond() {
-  const p = rh.res.filter((x) => x === 'PERFECT').length;
-  const g = rh.res.filter((x) => x === 'GOOD').length;
-  const m = rh.res.filter((x) => x === 'MISS').length;
-  const [hx, hy] = headPos();
-  mode = 'home';
-  rh = null;
-  gain({ trust: p * 5 + g * 2 - m, xp: p * 3 + g * 2, joy: p * 3 + g }, hx, hy - 40 * S);
-  toast(`교감 결과: 완벽 ${p} · 좋음 ${g} · 실패 ${m}`, 2.5);
-  if (p + g >= 5) { setAnim('happy', 1.2); say(['삐약삐약♪', '키이—♪', '…(당신을 바라본다)'][st.stage]); }
-}
-function drawRhythm() {
-  const [hx, hy] = headPos();
-  const tr = rhTarget();
-  ctx.save();
-  ctx.lineWidth = 4 * PS;
-  ctx.strokeStyle = 'rgba(255,215,120,0.9)';
-  ctx.shadowColor = '#ffb347'; ctx.shadowBlur = 14;
-  ctx.beginPath(); ctx.arc(hx, hy, tr, 0, Math.PI * 2); ctx.stroke();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(255,215,120,0.35)';
-  ctx.beginPath(); ctx.arc(hx, hy, tr - 20 * PS, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(hx, hy, tr + 20 * PS, 0, Math.PI * 2); ctx.stroke();
-  if (rh.phase === 'ring') {
-    ctx.lineWidth = 5 * PS;
-    ctx.strokeStyle = `rgba(${pal().glow},0.95)`;
-    ctx.shadowColor = `rgb(${pal().glow})`;
-    ctx.beginPath(); ctx.arc(hx, hy, Math.max(1, rh.r), 0, Math.PI * 2); ctx.stroke();
-  }
-  ctx.shadowBlur = 0;
-  ctx.font = `700 ${16 * Math.max(0.8, S)}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffeedd';
-  ctx.fillText(`교감 ${Math.min(rh.round + 1, rh.total)} / ${rh.total}`, W / 2, 40);
-  if (rh.judge && rh.judgeT > 0) {
-    const col = { PERFECT: '#ffe066', GOOD: '#9fe0ff', MISS: '#ff7a7a' }[rh.judge];
-    ctx.font = `800 ${30 * Math.max(0.8, S)}px sans-serif`;
-    ctx.fillStyle = col;
-    ctx.globalAlpha = Math.min(1, rh.judgeT * 3);
-    ctx.fillText({ PERFECT: '완벽!', GOOD: '좋아!', MISS: '실패…' }[rh.judge], hx, hy - tr - 30 * PS);
-  }
-  ctx.restore();
-}
-
-// ================= ember catch =================
-let ca = null;
-function startCatch() {
-  if (!needEnergy(15)) return;
-  st.energy -= 15;
-  mode = 'catch';
-  document.body.classList.add('mg');
-  ca = { t: 0, dur: 25, x: W / 2, tx: W / 2, kv: 0, items: [], score: 0, lives: 3, spawn: 0, cheer: 0, over: false };
-  toast('그릇을 움직여 불씨를 받으세요! 💧는 피하기', 2.2);
-}
-function updateCatch(dt) {
-  if (ca.over) return;
-  ca.t += dt;
-  if (ca.kv) ca.tx = clamp(ca.tx + ca.kv * 700 * S * dt, 0, W);
-  ca.x = lerp(ca.x, ca.tx, Math.min(1, dt * 14));
-  ca.spawn -= dt;
-  const diff = ca.t / ca.dur;
-  if (ca.spawn <= 0) {
-    ca.spawn = lerp(0.55, 0.28, diff);
-    const r = Math.random();
-    const type = r < 0.62 ? 'ember' : r < 0.78 ? 'fruit' : 'water';
-    ca.items.push({ x: rand(30, W - 30), y: -20, vy: rand(160, 240) * S * (1 + diff * 0.8), type, ph: rand(0, 6) });
-  }
-  const by = H - 70 * S, bw = 70 * S;
-  for (const it of ca.items) {
-    it.y += it.vy * dt;
-    it.x += Math.sin(T * 3 + it.ph) * 30 * S * dt;
-    if (!it.done && it.y > by - 12 * S && it.y < by + 18 * S && Math.abs(it.x - ca.x) < bw) {
-      it.done = true;
-      if (it.type === 'water') {
-        ca.lives--; SFX.splash();
-        emit(it.x, by, 18, { color: '#9fd8ff', smin: 60, smax: 200, rise: -200, lmax: 0.8 });
-        floatText(it.x, by - 30 * S, '치익…', '#9fd8ff');
-        if (ca.lives <= 0) endCatch();
-      } else {
-        const v = it.type === 'fruit' ? 3 : 1;
-        ca.score += v; ca.cheer = 0.5; SFX.pick();
-        emit(it.x, by - 10 * S, v * 6, { smin: 60, smax: 180 });
-        floatText(it.x, by - 30 * S, '+' + v);
-      }
-    }
-  }
-  ca.items = ca.items.filter((i) => !i.done && i.y < H + 30);
-  ca.cheer = Math.max(0, ca.cheer - dt);
-  if (ca.t >= ca.dur) endCatch();
-}
-function endCatch() {
-  if (ca.over) return;
-  ca.over = true;
-  const s = ca.score;
-  const reward = { hunger: Math.min(45, s * 2), joy: Math.min(30, s), xp: s * 2, trust: Math.floor(s / 5) };
-  showModal('불씨 잡기 결과', `<p class="stat-line">모은 불씨: <b>${s}</b></p>` +
-    `<p>포만감 +${reward.hunger} · 기분 +${reward.joy} · 경험치 +${reward.xp} · 신뢰 +${reward.trust}</p>`,
-    [{ label: '돌아가기', primary: true, fn: () => {
-      mode = 'home'; document.body.classList.remove('mg'); ca = null;
-      gain(reward); setAnim('happy', 1); say(['삐약! 맛있었어!', '배부르다!', '흡족하군.'][st.stage]);
-    } }]);
-}
-function drawItem(it) {
-  if (it.type === 'water') {
-    ctx.fillStyle = '#7fc8ff';
-    ctx.beginPath();
-    ctx.moveTo(it.x, it.y - 14 * S);
-    ctx.quadraticCurveTo(it.x + 10 * S, it.y, it.x, it.y + 8 * S);
-    ctx.quadraticCurveTo(it.x - 10 * S, it.y, it.x, it.y - 14 * S);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.beginPath(); ctx.arc(it.x - 3 * S, it.y - 1 * S, 2.5 * S, 0, Math.PI * 2); ctx.fill();
-    return;
-  }
-  const r = (it.type === 'fruit' ? 13 : 7) * S;
-  glow(it.x, it.y, r * 3, pal(), 0.5);
-  const g = ctx.createRadialGradient(it.x - r * 0.3, it.y - r * 0.3, 1, it.x, it.y, r);
-  g.addColorStop(0, '#fffbe0');
-  g.addColorStop(0.5, it.type === 'fruit' ? '#ff7a2a' : '#ffd04a');
-  g.addColorStop(1, it.type === 'fruit' ? '#b8200a' : '#ff7a1a');
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(it.x, it.y, r, 0, Math.PI * 2); ctx.fill();
-  if (it.type === 'fruit') {
-    ctx.fillStyle = '#4aa040';
-    ctx.beginPath(); ctx.ellipse(it.x + 4 * S, it.y - r, 6 * S, 3 * S, -0.5, 0, Math.PI * 2); ctx.fill();
-  }
-}
-function drawCatch() {
-  ctx.fillStyle = 'rgba(10,4,12,0.35)';
-  ctx.fillRect(0, 0, W, H);
-  for (const it of ca.items) drawItem(it);
-  // bowl
-  const by = H - 70 * S, bw = 70 * S;
-  glow(ca.x, by, 110 * S, pal(), 0.3 + ca.cheer * 0.6);
-  ctx.fillStyle = '#4a2c22';
-  ctx.beginPath();
-  ctx.moveTo(ca.x - bw, by);
-  ctx.quadraticCurveTo(ca.x, by + 60 * S, ca.x + bw, by);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#ff9a3a';
-  ctx.beginPath(); ctx.ellipse(ca.x, by, bw, 9 * S, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#ffe08a';
-  ctx.beginPath(); ctx.ellipse(ca.x, by, bw * 0.8, 5 * S, 0, 0, Math.PI * 2); ctx.fill();
-  // small phoenix watching
-  drawPhoenix(W - 110 * PS, H - 10 * S, st.stage, PS * 0.42, {
-    t: T, mood: 'idle', blink: 0, flapBoost: ca.cheer > 0 ? 3 : 1,
-  });
-  // HUD
-  ctx.font = `700 ${20 * Math.max(0.8, S)}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffeedd';
-  const left = Math.max(0, Math.ceil(ca.dur - ca.t));
-  ctx.fillText(`⏱ ${left}   🔥 ${ca.score}   ${'❤️'.repeat(Math.max(0, ca.lives))}${'🖤'.repeat(3 - Math.max(0, ca.lives))}`, W / 2, 40);
-}
-
-// ================= flight training =================
-let fl = null;
-function startFlight() {
-  if (st.stage < 1) return;
-  if (!needEnergy(25)) return;
-  st.energy -= 25;
-  mode = 'flight';
-  document.body.classList.add('mg');
-  fl = { t: 0, dur: 40, y: H * 0.45, vy: 0, flap: 0, obs: [], spawn: 1.2, score: 0, dead: false, over: false, scroll: 0, started: false };
-  toast('클릭 / 스페이스로 날갯짓! 불의 고리를 통과하세요', 2.5);
-}
-const FS = () => PS * 0.36;
-function flightFlap() {
-  if (!fl || fl.dead) return;
-  fl.started = true;
-  fl.vy = -430 * S;
-  fl.flap = 1;
-  SFX.flap();
-  emit(W * 0.25 - 30 * S, fl.y, 6, { angle: Math.PI * 0.75, spread: 0.6, smin: 60, smax: 160 });
-}
-function updateFlight(dt) {
-  if (fl.over) return;
-  fl.flap = Math.max(0, fl.flap - dt * 3);
-  if (!fl.started) { fl.y = H * 0.45 + Math.sin(T * 3) * 10 * S; return; }
-  fl.t += dt;
-  const speed = (230 + fl.t * 3) * S;
-  fl.scroll += speed * dt;
-  if (!fl.dead) {
-    fl.vy += 1250 * S * dt;
-    fl.y += fl.vy * dt;
-  } else {
-    fl.vy += 1500 * S * dt;
-    fl.y += fl.vy * dt;
-    if (fl.y > H + 80) endFlight();
-    return;
-  }
-  fl.spawn -= dt;
-  if (fl.spawn <= 0) {
-    fl.spawn = Math.max(1.15, 1.7 - fl.t * 0.012);
-    const gap = Math.max(170, 230 - fl.t * 1.4) * S;
-    fl.obs.push({ x: W + 60 * S, gy: rand(H * 0.25, H * 0.75), gap, w: 64 * S, got: false, seed: Math.floor(rand(1, 9999)) });
-  }
-  const fx = W * 0.25, r = 20 * S;
-  for (const o of fl.obs) {
-    o.x -= speed * dt;
-    if (!o.got && o.x < fx) {
-      o.got = true;
-      if (Math.abs(fl.y - o.gy) < o.gap * 0.3) {
-        fl.score++;
-        SFX.perfect();
-        emit(o.x, o.gy, 30, { smin: 80, smax: 240, rise: 0 });
-        floatText(o.x, o.gy - 40 * S, '불의 고리 +1');
-      }
-    }
-    // collision with rock columns
-    if (fx + r > o.x - o.w / 2 && fx - r < o.x + o.w / 2) {
-      if (fl.y - r < o.gy - o.gap / 2 || fl.y + r > o.gy + o.gap / 2) crash();
-    }
-  }
-  fl.obs = fl.obs.filter((o) => o.x > -100);
-  if (fl.y < r) { fl.y = r; fl.vy = 0; }
-  if (fl.y > H - 30 * S) crash();
-  if (fl.t >= fl.dur && !fl.dead) endFlight(true);
-}
-function crash() {
-  if (fl.dead) return;
-  fl.dead = true;
-  fl.vy = -200 * S;
-  SFX.crash();
-  emit(W * 0.25, fl.y, 40, { smin: 100, smax: 300, rise: 0 });
-}
-function endFlight(success) {
-  if (fl.over) return;
-  fl.over = true;
-  const s = fl.score;
-  const reward = { xp: s * 9 + (success ? 25 : 0), trust: Math.round(s * 1.5) + (success ? 5 : 0), joy: 8 + s };
-  showModal(success ? '비행 훈련 완주! 🎉' : '비행 훈련 종료',
-    `<p class="stat-line">통과한 불의 고리: <b>${s}</b></p>` +
-    (success ? '<p>끝까지 날아냈어요! 완주 보너스 획득.</p>' : '<p>바위에 부딪혔지만 불사조는 다치지 않아요. 불사조니까요.</p>') +
-    `<p>경험치 +${reward.xp} · 신뢰 +${reward.trust} · 기분 +${reward.joy}</p>`,
-    [{ label: '돌아가기', primary: true, fn: () => {
-      mode = 'home'; document.body.classList.remove('mg'); fl = null;
-      gain(reward); setAnim('happy', 1); say(st.stage === 1 ? '더 높이 날고 싶어!' : '하늘이 우리 것이로군.');
-    } }]);
-}
-function drawRock(o, top) {
-  const r = rng(o.seed + (top ? 0 : 500));
-  const x0 = o.x - o.w / 2, x1 = o.x + o.w / 2;
-  const edge = top ? o.gy - o.gap / 2 : o.gy + o.gap / 2;
-  ctx.fillStyle = '#2a1820';
-  ctx.beginPath();
-  if (top) {
-    ctx.moveTo(x0 - 10 * S, 0);
-    for (let i = 0; i <= 6; i++) ctx.lineTo(lerp(x0, x1, i / 6) + (r() - 0.5) * 8 * S, edge - (i % 2 ? 0 : 18 * S) * r());
-    ctx.lineTo(x1 + 10 * S, 0);
-  } else {
-    ctx.moveTo(x0 - 10 * S, H);
-    for (let i = 0; i <= 6; i++) ctx.lineTo(lerp(x0, x1, i / 6) + (r() - 0.5) * 8 * S, edge + (i % 2 ? 0 : 18 * S) * r());
-    ctx.lineTo(x1 + 10 * S, H);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,130,50,0.6)';
-  ctx.lineWidth = 2 * S;
-  ctx.stroke();
-}
-function drawFlight() {
-  // own parallax scene
-  const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#120c2e'); sky.addColorStop(0.55, '#7a3a4a'); sky.addColorStop(0.8, '#e07a3a'); sky.addColorStop(1, '#3a1410');
-  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-  glow(W * 0.7, H * 0.7, Math.max(W, H) * 0.4, PALS[0], 0.35);
-  const layers = [[0.15, H * 0.62, 60, '#5a3348'], [0.35, H * 0.72, 70, '#3a2232'], [0.7, H * 0.86, 40, '#1a0f14']];
-  for (const [sp, base, amp, col] of layers) {
-    ctx.fillStyle = col;
-    ctx.beginPath(); ctx.moveTo(0, H);
-    const off = fl.scroll * sp;
-    for (let x = 0; x <= W + 20; x += 20) {
-      const u = (x + off) / S;
-      ctx.lineTo(x, base - (Math.sin(u * 0.01) * 0.5 + Math.sin(u * 0.023 + 1) * 0.3 + Math.abs(Math.sin(u * 0.047)) * 0.4) * amp * S);
-    }
-    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
-  }
-  // obstacles: back half of ring, rocks, front half of ring
-  for (const o of fl.obs) {
-    const ry = o.gap * 0.32, rx = 16 * S;
-    ctx.lineWidth = 7 * S;
-    ctx.strokeStyle = o.got ? 'rgba(255,200,120,0.3)' : '#ff8a2a';
-    ctx.beginPath(); ctx.ellipse(o.x, o.gy, rx, ry, 0, Math.PI / 2, Math.PI * 1.5); ctx.stroke();
-    drawRock(o, true); drawRock(o, false);
-  }
-  const fx = W * 0.25;
-  ctx.save();
-  ctx.translate(fx, fl.y);
-  ctx.rotate(clamp(fl.vy / (900 * S), -0.5, fl.dead ? 1.4 : 0.6));
-  const P = BIRD[st.stage];
-  ctx.scale(FS(), FS());
-  ctx.translate(0, -P.bodyY * P.k);
-  if (st.stage === 0) drawChick(pal(), { t: T, blink: 0 });
-  else drawBird(P, pal(), { t: T, flying: true, flap: -0.6 * fl.flap + Math.sin(T * 8) * 0.12, blink: fl.dead ? 1 : 0 });
-  ctx.restore();
-  for (const o of fl.obs) {
-    const ry = o.gap * 0.32, rx = 16 * S;
-    ctx.save();
-    ctx.lineWidth = 7 * S;
-    ctx.strokeStyle = o.got ? 'rgba(255,200,120,0.3)' : '#ffd04a';
-    ctx.shadowColor = '#ff6a1a'; ctx.shadowBlur = o.got ? 0 : 18;
-    ctx.beginPath(); ctx.ellipse(o.x, o.gy, rx, ry, 0, -Math.PI / 2, Math.PI / 2); ctx.stroke();
-    ctx.restore();
-  }
-  ctx.font = `700 ${20 * Math.max(0.8, S)}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffeedd';
-  ctx.fillText(`⏱ ${Math.max(0, Math.ceil(fl.dur - fl.t))}   🔥 고리 ${fl.score}`, W / 2, 40);
-  if (!fl.started) {
-    ctx.font = `700 ${22 * Math.max(0.8, S)}px sans-serif`;
-    ctx.fillText('클릭 / 스페이스로 출발!', W / 2, H * 0.3);
-  }
-}
-
-// ================= evolution / endings =================
-function checkProgress() {
-  if (evo || mode !== 'home' || phx.sleeping > 0 || paused) return;
-  const g = GOALS[st.stage];
-  if (st.stage < 2 && st.xp >= g.xp && st.trust >= g.trust) {
-    evo = { t: 0, done: false };
-    SFX.evolve();
-    toast(`${st.name}의 몸이 빛나기 시작한다…!`, 2.5);
-    return;
-  }
-  if (st.stage === 2 && !st.tamed && st.trust >= 100) {
-    st.tamed = true;
-    save();
-    SFX.evolve();
-    showModal('🔥 길들이기 완료! 🔥',
-      `<p><b>${st.name}</b>이(가) 당신 곁에 날개를 접고 머리를 숙였습니다.<br>이제 당신의 영원한 동반자예요.</p>` +
-      `<p>플레이 시간: ${Math.floor(st.playTime / 60)}분 ${Math.floor(st.playTime % 60)}초${st.rebirths ? ` · 환생 ${st.rebirths}회` : ''}</p>` +
-      `<p>불사조는 재 속에서 다시 태어나며 새로운 빛깔의 불꽃을 얻습니다.</p>`,
-      [
-        { label: '계속 함께하기', fn: () => say('끼이이—!') },
-        { label: '🔥 환생의 의식', primary: true, fn: rebirth },
-      ]);
-    return;
-  }
-  if (st.trust <= 0) {
-    save();
-    showModal('불사조가 떠났습니다…',
-      `<p>오랫동안 배고프고 외로웠던 <b>${st.name}</b>은(는)<br>불꽃을 남기고 먼 하늘로 날아가 버렸어요.</p><p>둥지에 남은 재 속에서 새 알이 따뜻하게 빛나고 있습니다.</p>`,
-      [{ label: '새 알 품기', primary: true, fn: () => { st = newState(st.name, st.rebirths); parts = []; save(); } }]);
-  }
-}
-function rebirth() {
-  const name = st.name, rb = st.rebirths + 1;
-  evo = { t: 0, rebirth: true };
-  SFX.evolve();
-  setTimeout(() => {
-    st = newState(name, rb);
-    save();
-  }, 1600);
-}
-function updateEvo(dt) {
-  if (!evo) return;
-  const prev = evo.t;
-  evo.t += dt;
-  const [bx, by] = bodyPos();
-  emit(bx + rand(-60, 60) * S, by + 40 * S, 4, { angle: -Math.PI / 2, spread: 0.3, smin: 150, smax: 350, rise: 60, rmax: 6 });
-  if (!evo.rebirth && prev < 1.6 && evo.t >= 1.6) {
-    st.stage++;
-    save();
-  }
-  if (evo.t >= 3) {
-    if (evo.rebirth) toast(`재 속에서 다시 태어났다! ${pal().name}`, 3);
-    else toast(`${st.name}이(가) ${STAGE_NAMES[st.stage]}(으)로 성장했다!`, 3);
-    say(['삐약!', '키에에엑!', '끼이이이—!'][st.stage], 2);
-    evo = null;
-  }
-}
-
-// ================= main update / draw =================
-function updateHome(dt) {
-  if (!paused && !evo) {
-    const m = [1, 1.15, 1.3][st.stage];
-    if (phx.sleeping > 0) {
-      phx.sleeping -= dt;
-      if (Math.random() < dt * 2) { const [hx, hy] = headPos(); emit(hx + 20 * S, hy - 20 * S, 1, { kind: 'z', angle: -1.2, spread: 0.3, smin: 20, smax: 40, rise: 0, lmin: 1.5, lmax: 2, rmin: 3, rmax: 5 }); }
-      if (phx.sleeping <= 0) { phx.sleeping = 0; finishSleep(); }
-    } else {
-      st.hunger -= 0.3 * m * dt;
-      st.joy -= 0.22 * dt;
-      st.energy += 0.25 * dt;
-      if (st.hunger < 15 || st.joy < 15) st.trust -= 0.2 * dt;
-      else if (st.hunger > 55 && st.joy > 55) st.trust += 0.03 * dt;
-      st.playTime += dt;
-      clampStats();
-      chatterT -= dt;
-      if (chatterT <= 0) {
-        chatterT = rand(8, 14);
-        if (st.hunger < 25) say(['삐… 배고파…', '배가 고프다…', '…먹이를.'][st.stage]);
-        else if (st.joy < 25) say(['심심해… 삐…', '놀아줘!', '…지루하군.'][st.stage]);
-        else if (st.energy < 20) say(['졸려…', '하암…', '쉬고 싶다.'][st.stage]);
-        else if (Math.random() < 0.6) { say(['삐약!', '키릭?', '끼이—'][st.stage], 1.4); SFX.chirp(); }
-      }
-    }
-  }
-  night = lerp(night, phx.sleeping > 0 ? 0.55 : 0, Math.min(1, dt * 2));
-  checkProgress();
-}
-
-function updateCommon(dt) {
-  if (phx.animT > 0) { phx.animT -= dt; if (phx.animT <= 0) phx.anim = 'idle'; }
-  phx.blinkT -= dt;
-  if (phx.blinkT <= 0) { phx.blink = 1; phx.blinkT = rand(2.5, 5); }
-  phx.blink = Math.max(0, phx.blink - dt * 7);
-  if (bubble) { bubble.t -= dt; if (bubble.t <= 0) bubble = null; }
-  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').classList.remove('show'); }
-  updateParts(dt);
-  updateAmbient(dt);
-}
-
-function phoenixOpts() {
-  const o = { t: T, blink: phx.blink, mood: phx.anim, flapBoost: 1, sleep: phx.sleeping > 0, eat: phx.anim === 'eat' };
-  if (phx.anim === 'happy') o.flapBoost = 2.5;
-  if (phx.anim === 'angry') o.shake = 3;
-  if (evo) o.flapBoost = 4;
-  return o;
-}
-
-function drawBubble() {
-  if (!bubble) return;
-  const [hx, hy] = headPos();
-  ctx.font = `600 ${15 * Math.max(0.85, S)}px sans-serif`;
-  const tw = ctx.measureText(bubble.text).width;
-  const bw = tw + 22, bh = 30;
-  let x = hx + 30 * PS, y = hy - 80 * PS;
-  x = clamp(x, 10, W - bw - 10); y = clamp(y, 10, H - bh - 10);
-  ctx.globalAlpha = Math.min(1, bubble.t * 4);
-  ctx.fillStyle = 'rgba(255,248,235,0.95)';
-  ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(x, y, bw, bh, 12) : ctx.rect(x, y, bw, bh);
-  ctx.fill();
-  ctx.beginPath(); ctx.moveTo(x + 14, y + bh); ctx.lineTo(x + 6, y + bh + 10); ctx.lineTo(x + 26, y + bh); ctx.fill();
-  ctx.fillStyle = '#3a1a0a';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(bubble.text, x + 11, y + bh / 2 + 1);
-  ctx.textBaseline = 'alphabetic';
-  ctx.globalAlpha = 1;
-}
-
-function drawScene() {
-  ctx.drawImage(bgBack, 0, 0, W, H);
-  drawWaterfall(T);
-  ctx.drawImage(bgFront, 0, 0, W, H);
-  drawLavaFlames(T);
-  drawAmbient();
-}
-
-function draw() {
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  if (mode === 'flight') {
-    drawFlight();
-    drawParts();
-    return;
-  }
-  drawScene();
-  if (!st) return;
-  if (mode === 'catch') { drawCatch(); drawParts(); return; }
-
-  // passive ember emission
-  if (Math.random() < 0.5) {
-    const [bx, by, br] = bodyPos();
-    emit(bx + rand(-br * 1.6, br * 1.6), by + rand(-br, br * 0.5), 1, { angle: -Math.PI / 2, spread: 0.5, smin: 10, smax: 40, rise: 40, rmax: 3 });
-  }
-  let sc = PS * stageScale();
-  if (evo) {
-    const f = evo.t / 3;
-    sc *= 1 + Math.sin(f * Math.PI) * 0.08;
-  }
-  drawPhoenix(PX, PY + jump() * PS, st.stage, sc, phoenixOpts());
-  drawParts();
-  if (mode === 'rhythm') drawRhythm();
-  drawBubble();
-  if (evo) {
-    const f = evo.t;
-    const a = f < 1.6 ? (f / 1.6) * 0.9 : Math.max(0, 0.9 - (f - 1.6) * 0.8);
-    ctx.fillStyle = `rgba(255,240,210,${a})`;
-    ctx.fillRect(0, 0, W, H);
-  }
-  if (night > 0.01) {
-    ctx.fillStyle = `rgba(5,8,30,${night})`;
-    ctx.fillRect(0, 0, W, H);
-  }
-}
-
-let last = performance.now();
-function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
-  last = now;
-  T += dt;
-  updateCommon(dt);
-  if (st && !paused) {
-    if (mode === 'home') updateHome(dt);
-    else if (mode === 'rhythm') updateRhythm(dt);
-    else if (mode === 'catch') updateCatch(dt);
-    else if (mode === 'flight') updateFlight(dt);
-    updateEvo(dt);
-  }
-  if (st) {
-    hudT -= dt;
-    if (hudT <= 0) { hudT = 0.2; updateHUD(); }
-    saveT -= dt;
-    if (saveT <= 0 && mode !== 'title') { saveT = 5; save(); }
-  }
-  draw();
-  requestAnimationFrame(frame);
-}
-
-// ================= input =================
-function primaryAction() {
-  if (paused) return;
-  if (mode === 'rhythm') judgeRing(false);
-  else if (mode === 'flight') flightFlap();
-}
-cv.addEventListener('pointerdown', (e) => {
-  if (!st || paused) return;
-  const x = e.clientX, y = e.clientY;
-  if (mode === 'home' && !evo && phx.sleeping <= 0) {
-    const [bx, by, br] = bodyPos();
-    if (Math.hypot(x - bx, y - by) < br * 1.3) actPet();
-  } else if (mode === 'catch') {
-    ca.tx = x;
-  } else primaryAction();
-});
-cv.addEventListener('pointermove', (e) => {
-  if (mode === 'catch' && ca && (e.pointerType === 'mouse' || e.buttons)) ca.tx = e.clientX;
-});
-window.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT') return;
-  if (e.code === 'Space') { e.preventDefault(); primaryAction(); }
-  if (mode === 'catch' && ca) {
-    if (e.code === 'ArrowLeft' || e.code === 'KeyA') ca.kv = -1;
-    if (e.code === 'ArrowRight' || e.code === 'KeyD') ca.kv = 1;
-  }
-});
-window.addEventListener('keyup', (e) => {
-  if (mode === 'catch' && ca && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(e.code)) ca.kv = 0;
-});
-window.addEventListener('resize', resize);
-
-$('aFeed').onclick = actFeed;
-$('aPet').onclick = actPet;
-$('aBond').onclick = startBond;
-$('aCatch').onclick = startCatch;
-$('aFly').onclick = startFlight;
-$('aSleep').onclick = actSleep;
-$('mute').onclick = () => {
-  muted = !muted;
-  $('mute').textContent = muted ? '🔇 소리 꺼짐' : '🔊 소리 켜짐';
-};
-
-function begin(state) {
-  st = state;
-  mode = 'home';
-  document.body.classList.remove('title');
-  $('titleScreen').classList.add('hidden');
-  updateHUD();
-  say(['삐약?', '키릭!', '끼이—'][st.stage]);
-  save();
-}
-const saved = load();
-if (saved) {
-  $('btnContinue').classList.remove('hidden');
-  $('btnContinue').textContent = `이어하기 (${saved.name} · ${STAGE_NAMES[saved.stage]})`;
-  $('btnContinue').onclick = () => begin(saved);
-}
-$('btnNew').onclick = () => {
-  const name = ($('nameInput').value || '').trim() || '피닉스';
-  begin(newState(name));
-  toast('알에서 깨어난 새끼 불사조! 먹이를 주고 쓰다듬어 보세요', 3);
-};
-
-resize();
-requestAnimationFrame(frame);
-})();
-</script>
+<script src="assets.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
