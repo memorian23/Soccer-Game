@@ -1250,6 +1250,12 @@ function renderBattlePrep() {
     </div>
     <p class="odds">아군 전투력 ${fmt(pw)} · 적 예상: ${preview.n}마리, Lv.${preview.lv} 전후${N % 5 === 0 ? ', 보스 1마리' : ''}<br>
     최고 기록 스테이지 ${G.best} · 승리하면 다음 스테이지가 열리고, 야생 불사조를 포획할 수 있어요.</p>
+    <div class="row" style="align-items:center;margin-top:4px">
+      <span class="odds">난이도</span>
+      <select id="diffSel">${Object.entries(DIFF).map(([k, d]) => `<option value="${k}" ${(G.diff || 'normal') === k ? 'selected' : ''}>${d.name}</option>`).join('')}</select>
+      <span class="odds">공격 연출</span>
+      <select id="fxSel"><option value="simple" ${G.fx !== 'fancy' ? 'selected' : ''}>간단하게</option><option value="fancy" ${G.fx === 'fancy' ? 'selected' : ''}>화려하게</option></select>
+    </div>
     <label class="odds"><input type="checkbox" id="autoNext" ${G.autoNext ? 'checked' : ''}> 승리하면 자동으로 다음 스테이지 진행</label>
     <div class="odds" style="margin-top:8px">전투 아이템 (전투마다 1개씩 소모): ${BATTLE_ITEMS.map((it) => `<label style="margin:0 6px;white-space:nowrap;${inv(it.id) ? '' : 'opacity:.4'}"><input type="checkbox" data-bi="${it.id}" ${inv(it.id) && G.useNext && G.useNext[it.id] ? 'checked' : ''} ${inv(it.id) ? '' : 'disabled'}> ${it.icon}${it.name} ×${inv(it.id)}</label>`).join('')}<br><span>아이템은 🛒 상점에서 살 수 있어요.</span></div>
     <div class="row"><button id="goBattle" class="primary" ${pt.length ? '' : 'disabled'}>⚔️ 전투 시작</button></div>
@@ -1261,6 +1267,8 @@ function renderBattlePrep() {
   $('stPrev').onclick = () => { G.stage = N - 1; renderBattlePrep(); };
   $('stNext').onclick = () => { G.stage = N + 1; renderBattlePrep(); };
   $('autoNext').onchange = (e) => { G.autoNext = e.target.checked; save(); };
+  $('diffSel').onchange = (e) => { G.diff = e.target.value; save(); renderBattlePrep(); };
+  $('fxSel').onchange = (e) => { G.fx = e.target.value; save(); };
   $('goBattle').onclick = () => startBattle(N);
   for (const cb of $('sheetBody').querySelectorAll('[data-bi]')) cb.onchange = () => { G.useNext = G.useNext || {}; G.useNext[cb.dataset.bi] = cb.checked; save(); };
   for (const el of $('sheetBody').querySelectorAll('.card-ph')) el.onclick = () => showDetail(byUid(+el.dataset.uid));
@@ -1680,36 +1688,45 @@ function elemMult(a, d) {
   if (ADV[d] === a) return 0.75;
   return 1;
 }
+const DIFF = {
+  easy: { name: '쉬움', mul: 0.5, count: 0.5, ai: 0.35 },
+  normal: { name: '보통', mul: 0.7, count: 0.6, ai: 0.6 },
+  hard: { name: '어려움', mul: 1.0, count: 0.8, ai: 1 },
+};
+const diff = () => DIFF[G.diff] || DIFF.normal;
+const fancy = () => G.fx === 'fancy' && B && !B.many;
 function enemyPlan(N, partyN) {
-  const n = clamp(Math.round(Math.max(1, partyN) * 0.75 + N / 4), 1, Math.max(3, partyN + 3 + Math.floor(N / 8)));
-  const lv = Math.max(1, Math.round(N * 1.25 - 0.5));
+  const d = diff();
+  const n = clamp(Math.round(Math.max(1, partyN) * d.count + N / 8), 1, Math.max(2, partyN + 1 + Math.floor(N / 15)));
+  const lv = Math.max(1, Math.round(N * 0.8));
   return { n, lv };
 }
 function genEnemies(N, partyN) {
   const plan = enemyPlan(N, partyN);
   const list = [];
   for (let i = 0; i < plan.n; i++) {
-    const lv = clamp(plan.lv + Math.floor(rand(-1, 2)), 1, 50);
-    const st = lv >= 25 ? 2 : lv >= 10 ? 1 : 0;
-    list.push({ c: randomColorOf(rollRarity(Math.min(0.6, N / 60))), st, lv: Math.min(lv, LV_CAP[st]), star: N > 30 ? Math.floor(rand(0, Math.min(5, N / 20))) : 0, bond: Math.min(100, N), uid: -i - 1 });
+    const lv = clamp(plan.lv + Math.floor(rand(-1, 1)), 1, 50);
+    const st = lv >= 32 ? 2 : lv >= 16 ? 1 : 0;
+    list.push({ c: randomColorOf(rollRarity(Math.min(0.35, N / 120))), st, lv: Math.min(lv, LV_CAP[st]), star: N > 60 ? Math.floor(rand(0, Math.min(3, N / 40))) : 0, bond: 0, uid: -i - 1 });
   }
   if (N % 5 === 0) {
-    const lv = Math.min(50, plan.lv + 3), st = lv >= 25 ? 2 : lv >= 10 ? 1 : 0;
-    list.unshift({ c: randomColorOf(N % 50 === 0 ? 5 : N % 25 === 0 ? 4 : Math.min(4, 3 + (Math.random() < N / 100 ? 1 : 0))), st, lv: Math.min(lv, LV_CAP[st]), star: Math.min(5, Math.floor(N / 15)), bond: 100, uid: -999, boss: true });
+    const lv = Math.min(50, plan.lv + 1), st = lv >= 32 ? 2 : lv >= 16 ? 1 : 0;
+    list.unshift({ c: randomColorOf(N % 50 === 0 ? 5 : N % 25 === 0 ? 4 : Math.min(4, 3 + (Math.random() < N / 100 ? 1 : 0))), st, lv: Math.min(lv, LV_CAP[st]), star: Math.min(3, Math.floor(N / 30)), bond: 0, uid: -999, boss: true });
   }
   return list;
 }
 function mkUnit(p, side) {
   const s = statsOf(p);
   const boss = !!p.boss;
-  const hp = boss ? s.hp * 3 : s.hp;
-  return { p, side, boss, hp, max: hp, atk: s.atk, def: s.def, spd: s.spd, elem: COLORS[p.c].elem, glow: COLORS[p.c].glow,
+  const m = side === 1 ? diff().mul : 1;
+  const hp = Math.round((boss ? s.hp * 1.8 : s.hp) * m);
+  return { p, side, boss, hp, max: hp, atk: Math.round(s.atk * m), def: Math.round(s.def * m), spd: side === 1 ? s.spd * (0.85 + 0.15 * m) : s.spd, elem: COLORS[p.c].elem, glow: COLORS[p.c].glow,
     atb: Math.random() * 0.6, cd1: 1, cd2: 2, revived: false, dead: false, fade: 1, lunge: 0, flash: 0, x: 0, y: 0, s: 50 };
 }
 function startBattle(N) {
   const pt = party();
   if (!pt.length) return toast('출전할 불사조를 먼저 고르세요');
-  B = { N, t: 0, allies: pt.map((p) => mkUnit(p, 0)), foes: genEnemies(N, pt.length).map((p) => mkUnit(p, 1)), shots: [], gauge: [0, 0], over: false, aiUltDelay: rand(1, 3), storm: 0 };
+  B = { N, t: 0, allies: pt.map((p) => mkUnit(p, 0)), foes: genEnemies(N, pt.length).map((p) => mkUnit(p, 1)), shots: [], gauge: [0, 0], over: false, aiUltDelay: rand(3, 6), storm: 0 };
   B.many = B.allies.length + B.foes.length > 30;
   B.buff = {};
   const used = [];
@@ -1727,8 +1744,9 @@ function startBattle(N) {
   $('bStage').textContent = `⚔️ 스테이지 ${N}${N % 5 === 0 ? ' 👹' : ''} · 아군 ${B.allies.length} vs 적 ${B.foes.length}`;
   $('bTactic').value = G.tactic;
   $('bSpeed').textContent = `▶ x${G.speed}`;
+  $('bFx').textContent = G.fx === 'fancy' ? '✨ 화려' : '✨ 간단';
   syncUI();
-  toast(`전투 시작! 적 ${B.foes.length}마리`, 1.5);
+  toast(`전투 시작! 적 ${B.foes.length}마리 (${diff().name})`, 1.5);
 }
 function fitGrid(n, aw, ah) {
   let best = { s: 0, c: 1, r: 1 };
@@ -1759,7 +1777,8 @@ function layoutBattle() {
 const alive = (arr) => arr.filter((u) => !u.dead);
 function chooseTarget(u, foes) {
   if (u.side === 1) {
-    // AI: weighs type advantage, finishing blows and dangerous attackers
+    // AI: weighs type advantage, finishing blows and dangerous attackers (sloppier on lower difficulty)
+    if (Math.random() > diff().ai) return pick(foes);
     let best = null, bs = -1e9;
     for (const f of foes) {
       const sc = elemMult(u.elem, f.elem) * 2 + (1 - f.hp / f.max) * 1.6 + (f.atk / u.atk) * 0.4 + (f.hp < u.atk * 1.2 ? 1.5 : 0) + Math.random() * 0.3;
@@ -1789,10 +1808,10 @@ function act(u) {
     for (const f of friends) {
       const h = Math.round(Math.min(f.max - f.hp, amt));
       f.hp += h;
-      if (h > 0 && !B.many) floatText(f.x, f.y - f.s * 0.4, '+' + h, '#8aff9a', 14);
-      emit(f.x, f.y, 4, { color: '140,255,160', smin: 20, smax: 70, rise: 60 });
+      if (h > 0 && fancy()) floatText(f.x, f.y - f.s * 0.4, '+' + h, '#8aff9a', 14);
+      if (h > 0) emit(f.x, f.y, fancy() ? 4 : 2, { color: '140,255,160', smin: 20, smax: 70, rise: 60 });
     }
-    if (!B.many) floatText(u.x, u.y - u.s * 0.55, '불사조의 축복', '#8aff9a', 15);
+    if (fancy()) floatText(u.x, u.y - u.s * 0.55, '불사조의 축복', '#8aff9a', 15);
     return;
   }
   if (u.p.st >= 1 && u.cd1 <= 0 && foes.length >= 2) {
@@ -1800,8 +1819,13 @@ function act(u) {
     u.lunge = 1;
     SFX.fire();
     const targets = foes.length > 12 ? foes.sort(() => Math.random() - 0.5).slice(0, 12) : foes;
-    for (const f of targets) B.shots.push({ u, f, t: 0, dur: 0.45, mult: 0.55, kind: 'ball' });
-    if (!B.many) floatText(u.x, u.y - u.s * 0.55, '화염 날개', '#ffd04a', 15);
+    if (fancy()) {
+      for (const f of targets) B.shots.push({ u, f, t: 0, dur: 0.45, mult: 0.55, kind: 'ball' });
+      floatText(u.x, u.y - u.s * 0.55, '화염 날개', '#ffd04a', 15);
+    } else {
+      // simple mode: one visible flame, the other targets just flash when hit
+      targets.forEach((f, i) => B.shots.push({ u, f, t: 0, dur: i ? 0.45 : 0.55, mult: 0.55, kind: i ? 'hidden' : 'breath' }));
+    }
     return;
   }
   u.lunge = 1;
@@ -1823,15 +1847,16 @@ function dealDamage(f, dmg, fromSide, em = 1, crit = false) {
   f.hp -= dmg;
   f.flash = 1;
   B.gauge[fromSide] = Math.min(100, B.gauge[fromSide] + (dmg / f.max) * 22);
-  B.gauge[f.side] = Math.min(100, B.gauge[f.side] + (dmg / f.max) * 10);
-  if (!B.many || (crit && Math.random() < 0.25)) floatText(f.x + rand(-8, 8), f.y - f.s * 0.35, (crit ? '치명! ' : '') + dmg + (em > 1.2 ? '↑' : em < 1 ? '↓' : ''), crit ? '#ffd04a' : em > 1.2 ? '#ff8a5a' : '#ffffff', crit ? 18 : 14);
+  B.gauge[f.side] = Math.min(100, B.gauge[f.side] + (dmg / f.max) * (f.side === 1 ? 10 * diff().ai : 10));
+  if (fromSide === 1) B.gauge[1] = Math.max(0, B.gauge[1] - (dmg / f.max) * 22 * (1 - diff().ai * 0.6));
+  if (fancy() || (crit && !B.many)) floatText(f.x + rand(-8, 8), f.y - f.s * 0.35, (crit ? '치명! ' : '') + dmg + (em > 1.2 ? '↑' : em < 1 ? '↓' : ''), crit ? '#ffd04a' : em > 1.2 ? '#ff8a5a' : '#ffffff', crit ? 18 : 14);
   if (Math.random() < 0.3) SFX.hit();
   if (f.hp <= 0) {
     if (f.p.st === 2 && !f.revived) {
       f.revived = true;
       f.hp = Math.round(f.max * 0.35);
       emit(f.x, f.y, 40, { color: f.glow, smin: 80, smax: 260, rise: 40 });
-      if (!B.many || Math.random() < 0.3) floatText(f.x, f.y - f.s * 0.6, '🔥 부활!', '#ffb347', 18);
+      if (fancy() || (!B.many && Math.random() < 0.5)) floatText(f.x, f.y - f.s * 0.6, '🔥 부활!', '#ffb347', 18);
       SFX.heal();
     } else if (f.side === 0 && B.buff && B.buff.rev && !f.itemRev) {
       f.itemRev = true;
@@ -1851,11 +1876,11 @@ function useUlt(side) {
   B.storm = 1.2; B.stormSide = side;
   SFX.storm();
   const targets = alive(side === 0 ? B.foes : B.allies);
-  const casters = alive(side === 0 ? B.allies : B.foes).sort(() => Math.random() - 0.5).slice(0, 24);
+  const casters = alive(side === 0 ? B.allies : B.foes).sort(() => Math.random() - 0.5).slice(0, fancy() ? 24 : 3);
   if (targets.length) for (const c of casters) B.shots.push({ u: c, f: pick(targets), t: 0, dur: 0.7, mult: 0, kind: 'breath', visual: true });
   for (const f of targets) {
     dealDamage(f, Math.max(1, Math.round(f.max * (f.boss ? 0.1 : 0.24))), side);
-    emit(f.x, f.y, 10, { smin: 60, smax: 200, rise: 50, color: '255,150,50' });
+    emit(f.x, f.y, fancy() ? 10 : 3, { smin: 60, smax: 200, rise: 50, color: '255,150,50' });
   }
   toast(side === 0 ? '🔥 피닉스 폭풍!' : '⚠️ 적의 피닉스 폭풍!', 1.4);
 }
@@ -1867,7 +1892,7 @@ function updateBattle(rawDt) {
     u.lunge = Math.max(0, u.lunge - dt * 4);
     u.flash = Math.max(0, u.flash - dt * 5);
     if (u.dead) { u.fade = Math.max(0, u.fade - dt * 1.5); continue; }
-    u.atb += u.spd * 0.075 * dt;
+    u.atb += u.spd * 0.06 * dt;
     if (u.atb >= 1) { u.atb -= 1; act(u); }
   }
   for (const s of B.shots) {
@@ -1876,9 +1901,9 @@ function updateBattle(rawDt) {
     if (s.t >= hitAt && !s.hit) {
       s.hit = true;
       if (!s.visual) hitUnit(s.u, s.f, s.mult);
-      emit(s.f.x, s.f.y, B.many ? 3 : 12, { color: s.u.glow, smin: 60, smax: 220, rise: 40, rmax: 4 });
+      if (s.kind !== 'hidden' || fancy()) emit(s.f.x, s.f.y, fancy() ? 12 : 4, { color: s.u.glow, smin: 60, smax: 180, rise: 40, rmax: 3.5 });
     }
-    if (s.kind === 'breath' && !s.hit && (!B.many || Math.random() < 0.25)) {
+    if (s.kind === 'breath' && !s.hit && fancy()) {
       const [mx, my] = mouthPos(s.u);
       const q = Math.random() * Math.min(1, s.t / (s.dur * 0.55));
       emit(lerp(mx, s.f.x, q), lerp(my, s.f.y, q), 1, { color: s.u.glow, smin: 10, smax: 60, rise: 50, rmax: 3.5, lmax: 0.6 });
@@ -1888,7 +1913,7 @@ function updateBattle(rawDt) {
   B.shots = B.shots.filter((s) => !s.done);
   if (B.storm > 0) B.storm -= rawDt;
   // AI uses its ultimate when charged
-  if (B.gauge[1] >= 100) { B.aiUltDelay -= dt; if (B.aiUltDelay <= 0) { useUlt(1); B.aiUltDelay = rand(0.5, 2.5); } }
+  if (B.gauge[1] >= 100) { B.aiUltDelay -= dt; if (B.aiUltDelay <= 0) { useUlt(1); B.aiUltDelay = rand(2, 5); } }
   const ub = $('ultBtn');
   $('ultFill').style.width = B.gauge[0] + '%';
   ub.disabled = B.gauge[0] < 100;
@@ -1961,7 +1986,7 @@ function drawBreath(s) {
   if (len < 2) return;
   const ang = Math.atan2(ey - my, ex - mx);
   const w0 = Math.max(2.5, s.u.s * 0.025);
-  const w1 = Math.max(9, s.u.s * 0.17) * (0.85 + 0.15 * Math.sin(T * 40 + s.u.x));
+  const w1 = Math.max(7, s.u.s * (fancy() ? 0.17 : 0.1)) * (0.88 + 0.12 * Math.sin(T * 40 + s.u.x));
   ctx.save();
   ctx.translate(mx, my);
   ctx.rotate(ang);
@@ -1973,7 +1998,7 @@ function drawBreath(s) {
   g.addColorStop(0.75, `rgba(${s.u.glow},0.6)`);
   g.addColorStop(1, `rgba(${s.u.glow},0)`);
   ctx.fillStyle = g;
-  const N = B.many ? 4 : 9;
+  const N = fancy() ? 9 : 4;
   ctx.beginPath();
   ctx.moveTo(0, -w0);
   for (let i = 1; i <= N; i++) { const q = i / N; ctx.lineTo(len * q, -lerp(w0, w1, Math.sqrt(q)) + Math.sin(T * 31 + i * 1.7) * w1 * 0.22); }
@@ -2003,6 +2028,7 @@ function drawBattle() {
   for (const u of B.allies) drawUnit(u);
   for (const u of B.foes) drawUnit(u);
   for (const s of B.shots) {
+    if (s.kind === 'hidden') continue;
     if (s.kind === 'breath') { drawBreath(s); continue; }
     const f = Math.min(1, s.t / s.dur);
     const [mx, my] = mouthPos(s.u);
@@ -2157,6 +2183,7 @@ $('mute').onclick = () => { G.muted = !G.muted; save(); updateTop(); };
 for (const b of document.querySelectorAll('#nav button')) b.onclick = () => goTab(b.dataset.tab);
 $('bSpeed').onclick = () => { G.speed = G.speed === 1 ? 2 : G.speed === 2 ? 4 : 1; $('bSpeed').textContent = `▶ x${G.speed}`; save(); };
 $('bTactic').onchange = (e) => { G.tactic = e.target.value; save(); };
+$('bFx').onclick = () => { G.fx = G.fx === 'fancy' ? 'simple' : 'fancy'; $('bFx').textContent = G.fx === 'fancy' ? '✨ 화려' : '✨ 간단'; save(); };
 $('ultBtn').onclick = () => useUlt(0);
 $('xBack').onclick = () => { X = null; mode = 'home'; parts = []; goTab('explore'); };
 $('bRetreat').onclick = () => {
