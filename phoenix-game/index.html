@@ -125,6 +125,8 @@
   @media (max-width: 640px) {
     #repCard { width: auto; right: 8px; top: 76px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; padding: 7px 10px; }
     #repCard .head { grid-column: 1 / -1; }
+    #nav button { font-size: 11px; min-width: 0; }
+    #nav button span { font-size: 18px; }
     #homeActions { left: 0; right: 0; top: auto; bottom: 70px; width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; padding: 0 8px; }
     #homeActions button { font-size: 13px; padding: 7px 9px; }
     .chip { font-size: 12px; padding: 4px 9px; }
@@ -170,6 +172,7 @@
   <button data-tab="storage"><span>📦</span>보관함</button>
   <button data-tab="fusion"><span>🧬</span>합성</button>
   <button data-tab="hatch"><span>🥚</span>부화</button>
+  <button data-tab="shop"><span>🛒</span>상점</button>
   <button data-tab="explore"><span>🧭</span>탐험</button>
   <button data-tab="battle"><span>⚔️</span>전투</button>
   <button data-tab="dex"><span>📖</span>도감</button>
@@ -208,10 +211,11 @@
 <div id="title" class="overlay">
   <div class="card">
     <h1>불사조 길들이기</h1>
-    <p>새끼 → 청년 → 어른으로 키우고, 200가지 빛깔의 불사조를 모으고 탐험하며 AI와 겨루세요.</p>
+    <p>새끼 → 청년 → 어른으로 키우고, 200가지 빛깔과 신 등급 10종의 불사조를 모으고 탐험하며 AI와 겨루세요.</p>
     <ul>
       <li><b>둥지</b>: 대표 불사조를 쓰다듬고 먹이고 교감해 길들이기</li>
-      <li><b>진화</b>: 레벨 10에 청년, 25에 어른으로 진화</li>
+      <li><b>진화</b>: 불씨만 있으면 언제든 청년·어른으로 진화</li>
+      <li><b>상점</b>: 물약·깃털·부적·전투 비약·특별한 알 구매</li>
       <li><b>합성</b>: 두 불사조를 섞어 새로운 색과 높은 희귀도 노리기</li>
       <li><b>부화</b>: 알을 부화해 200가지 색 중 하나 얻기</li>
       <li><b>탐험</b>: 다섯 지역을 돌아다니며 야생 불사조를 만나 포획하기</li>

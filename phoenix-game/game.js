@@ -68,10 +68,10 @@ const MYTHIC = {
   80: ['흑염', 'black'], 84: ['백염', 'white'], 88: ['무지개', 'rainbow'], 92: ['은하', 'galaxy'], 96: ['황혼', 'dusk'],
   180: ['태초', 'primal'], 184: ['심연', 'abyss'], 188: ['오로라', 'aurora'], 192: ['성운', 'nebula'], 196: ['불멸', 'immortal'],
 };
-const RARITY = ['일반', '희귀', '영웅', '전설', '신화'];
-const RARITY_COL = ['#bdbdbd', '#5ab0ff', '#c77dff', '#ffb347', '#ff5a7a'];
+const RARITY = ['일반', '희귀', '영웅', '전설', '신화', '신'];
+const RARITY_COL = ['#bdbdbd', '#5ab0ff', '#c77dff', '#ffb347', '#ff5a7a', '#fff1a0'];
 const ELEM = {
-  fire: { n: '화', i: '🔥' }, wind: { n: '풍', i: '🍃' }, water: { n: '수', i: '💧' }, spirit: { n: '영', i: '🔮' }, holy: { n: '신성', i: '✨' },
+  fire: { n: '화', i: '🔥' }, wind: { n: '풍', i: '🍃' }, water: { n: '수', i: '💧' }, spirit: { n: '영', i: '🔮' }, holy: { n: '신성', i: '✨' }, divine: { n: '신', i: '👑' },
 };
 const BASE_HUE = 33; // average hue of the original flames
 const STARTER_COLOR = 2; // 호박 — practically the original artwork colours
@@ -120,9 +120,32 @@ for (let t = 0; t < TONES.length; t++) {
     }
   }
 }
+// 신(god) grade — 10 phoenixes above mythic
+const GODS = [
+  ['천제', { mat: () => mFor(BASE_HUE, 0.2, 1.3), post: 'gild', stars: [255, 230, 120] }],
+  ['태양신', { mat: () => mFor(42, 1.8, 1.18), post: 'gild', stars: [255, 255, 200] }],
+  ['월신', { mat: () => mFor(215, 0.35, 1.25), post: 'frost', stars: [255, 255, 255] }],
+  ['뇌신', { mat: (fx, fy) => mFor(55 + fy * 150, 1.6, 1.15), perRow: true, stars: [200, 255, 255] }],
+  ['해신', { mat: (fx, fy) => mFor(170 + fy * 60, 1.4, 1.0), perRow: true, post: 'frost' }],
+  ['명계신', { mat: () => mFor(280, 1.4, 0.95), post: 'lava', stars: [200, 120, 255] }],
+  ['시간신', { mat: () => mFor(42, 0.55, 1.15), post: 'ghost', stars: [255, 240, 180] }],
+  ['창세신', { mat: (fx) => mFor(fx * 360, 1.5, 1.1), perCol: true, post: 'gild' }],
+  ['혼돈신', { mat: (fx, fy) => mFor(fy * 300, 1.3, 1.0), perRow: true, post: 'invert' }],
+  ['영원신', { mat: () => mFor(BASE_HUE, 0.05, 1.3), post: 'prism' }],
+];
+for (const [nm, o] of GODS) {
+  COLORS.push({ id: COLORS.length, name: nm + ' 불사조', short: nm, rar: 5, elem: 'divine', kind: 'god', matFn: o.mat, perCol: !!o.perCol, perRow: !!o.perRow, post: o.post || null, stars: o.stars || null, hIdx: -1 });
+}
+function hueRGB(h) {
+  h = ((h % 360) + 360) % 360 / 60;
+  const x = 1 - Math.abs((h % 2) - 1);
+  const t = [[1, x, 0], [x, 1, 0], [0, 1, x], [0, x, 1], [x, 0, 1], [1, 0, x]][Math.floor(h) % 6];
+  return t.map((v) => v * 255);
+}
 const PER_COL = new Set(['rainbow', 'aurora']);
 const PER_ROW = new Set(['galaxy', 'dusk', 'primal', 'nebula', 'dual']);
 function colorMatrix(C, fx, fy) {
+  if (C.matFn) return C.matFn(fx, fy);
   switch (C.kind) {
     case 'black': return mFor(BASE_HUE, 0.25, 0.42);
     case 'white': return mFor(BASE_HUE, 0.08, 1.32);
@@ -140,7 +163,7 @@ function colorMatrix(C, fx, fy) {
 }
 for (const C of COLORS) {
   const [r, g, b] = applyM(colorMatrix(C, 0.5, 0.5), 255, 150, 50);
-  C.glow = C.kind === 'abyss' ? '120,240,255' : C.kind === 'immortal' ? '255,220,130' : `${Math.round(r)},${Math.round(g)},${Math.round(b)}`;
+  C.glow = C.kind === 'abyss' ? '120,240,255' : C.kind === 'immortal' ? '255,220,130' : C.post === 'invert' || C.post === 'prism' ? '255,236,160' : `${Math.round(r)},${Math.round(g)},${Math.round(b)}`;
 }
 
 function colorize(src, C) {
@@ -150,7 +173,7 @@ function colorize(src, C) {
   const g = c.getContext('2d', { willReadFrequently: true });
   g.drawImage(src, 0, 0);
   const d = g.getImageData(0, 0, w, h), p = d.data;
-  const perCol = PER_COL.has(C.kind), perRow = PER_ROW.has(C.kind);
+  const perCol = C.perCol || PER_COL.has(C.kind), perRow = C.perRow || PER_ROW.has(C.kind);
   const fixed = !perCol && !perRow ? colorMatrix(C, 0.5, 0.5) : null;
   const cols = perCol ? Array.from({ length: w }, (_, x) => colorMatrix(C, x / w, 0.5)) : null;
   const post = C.post;
@@ -178,6 +201,10 @@ function colorize(src, C) {
           r2 = lerp(r2, 230, 0.15); g2 = lerp(g2, 240, 0.15); b2 = lerp(b2, 255, 0.15);
         } else if (post === 'aurora') {
           p[i + 3] *= 0.88;
+        } else if (post === 'invert') {
+          r2 = 255 - r2 * 0.85; g2 = 255 - g2 * 0.85; b2 = 255 - b2 * 0.85;
+        } else if (post === 'prism') {
+          if (l > 0.42) { const k = Math.min(1, (l - 0.42) / 0.4) * 0.8, hc = hueRGB((x / w + y / h) * 360); r2 = lerp(r2, hc[0], k); g2 = lerp(g2, hc[1], k); b2 = lerp(b2, hc[2], k); }
         } else if (post === 'gild') {
           if (l > 0.5) { const k = Math.min(1, (l - 0.5) / 0.4) * 0.85; r2 = lerp(r2, 255, k); g2 = lerp(g2, 212, k); b2 = lerp(b2, 90, k); }
         }
@@ -222,8 +249,8 @@ const bigURL = (cid, st) => colored(cid, st, false).toDataURL('image/png');
 // phoenix model
 // ============================================================
 const LV_CAP = [15, 30, 50];
-const EVO = [{ lv: 10, cost: 150 }, { lv: 25, cost: 500 }];
-const RAR_MUL = [1, 1.15, 1.32, 1.55, 1.85];
+const EVO = [{ cost: 300 }, { cost: 1000 }]; // evolution needs only 불씨
+const RAR_MUL = [1, 1.15, 1.32, 1.55, 1.85, 2.3];
 const STAGE_MUL = [1, 1.55, 2.2];
 const expNeed = (lv) => 20 + lv * lv * 3;
 
@@ -282,7 +309,7 @@ function addExp(p, n) {
   if (p.lv >= LV_CAP[p.st]) p.xp = Math.min(p.xp, expNeed(p.lv));
   return ups;
 }
-const canEvolve = (p) => p.st < 2 && p.lv >= EVO[p.st].lv;
+const canEvolve = (p) => p.st < 2;
 
 // ============================================================
 // canvas
@@ -404,6 +431,28 @@ function drawAmbient() {
     ctx.globalAlpha = Math.min(1, (1 - a.life / a.max) * 1.5) * 0.8;
     ctx.fillStyle = '#ff9a3a';
     ctx.beginPath(); ctx.arc(a.x, a.y, a.s, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawHalo(x, y, r, a = 1) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = a;
+  ctx.translate(x, y);
+  ctx.strokeStyle = 'rgba(255,236,150,0.85)';
+  ctx.lineWidth = Math.max(1.5, r * 0.025);
+  ctx.shadowColor = '#ffe680'; ctx.shadowBlur = 12;
+  ctx.rotate(T * 0.6);
+  ctx.setLineDash([r * 0.18, r * 0.09]);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.rotate(-T * 1.4);
+  ctx.setLineDash([r * 0.05, r * 0.12]);
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  for (let i = 0; i < 6; i++) {
+    const an = T * 0.8 + (i / 6) * Math.PI * 2;
+    ctx.fillStyle = 'rgba(255,245,200,0.9)';
+    ctx.beginPath(); ctx.arc(Math.cos(an) * r, Math.sin(an) * r, Math.max(1.5, r * 0.03), 0, Math.PI * 2); ctx.fill();
   }
   ctx.restore();
 }
@@ -556,6 +605,7 @@ function drawHome() {
       shake = homeAnim.angry > 0 ? Math.sin(T * 60) * 4 : 0;
       glow(R.x + R.w / 2, R.y + R.h * 0.55, R.w * 0.6, COLORS[cid].glow, homeAnim.angry > 0 ? 0.55 : 0.22);
     }
+    if (COLORS[cid].rar === 5) { glow(R.x + R.w / 2, R.y + R.h * 0.5, R.w * 0.7, '255,236,150', 0.3); drawHalo(R.x + R.w / 2, R.y + R.h * 0.48, Math.min(R.w, R.h) * 0.5); }
     ctx.save();
     ctx.translate(R.x + R.w / 2 + shake, R.y + R.h + hop);
     ctx.scale(1, breath);
@@ -906,7 +956,7 @@ function goTab(t) {
   syncUI();
 }
 function renderSheet() {
-  ({ storage: renderStorage, fusion: renderFusion, hatch: renderHatch, explore: renderExplore, battle: renderBattlePrep, dex: renderDex })[tab]();
+  ({ storage: renderStorage, fusion: renderFusion, hatch: renderHatch, shop: renderShop, explore: renderExplore, battle: renderBattlePrep, dex: renderDex })[tab]();
 }
 function tool(label, fn, cls) {
   const b = document.createElement('button');
@@ -917,7 +967,7 @@ function tool(label, fn, cls) {
 }
 function cardHTML(p, extra = '') {
   const C = COLORS[p.c];
-  return `<div class="card-ph ${extra}" data-uid="${p.uid}" style="border-color:${RARITY_COL[C.rar]}">
+  return `<div class="card-ph ${extra}" data-uid="${p.uid}" style="border-color:${RARITY_COL[C.rar]}${C.rar === 5 ? ';box-shadow:0 0 14px #ffe680' : ''}">
     ${p.party ? '<span class="badge">출전</span>' : ''}${p.uid === G.rep ? '<span class="badge rep">대표</span>' : ''}
     <img src="${thumbURL(p.c, p.st)}" alt="" loading="lazy">
     <div class="nm">${esc(nameOf(p))}</div>
@@ -967,7 +1017,7 @@ function renderStorage() {
 function showDetail(p) {
   const C = COLORS[p.c], s = statsOf(p);
   const need = expNeed(p.lv), cap = p.lv >= LV_CAP[p.st];
-  const evoTxt = p.st < 2 ? `진화 조건: Lv.${EVO[p.st].lv} · 불씨 ${EVO[p.st].cost}` : '최종 진화 단계';
+  const evoTxt = p.st < 2 ? `진화 비용: 불씨 ${EVO[p.st].cost} (레벨 조건 없음)` : '최종 진화 단계';
   const release = 15 + C.rar * 25 + p.lv * 3;
   const html = `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${bigURL(p.c, p.st)}" alt=""></div>
     <p style="color:${RARITY_COL[C.rar]};font-weight:700">${RARITY[C.rar]} · ${ELEM[C.elem].i} ${ELEM[C.elem].n} 속성 · ${STAGE_NAMES[p.st]} 불사조 ${stars(p.star)}</p>
@@ -1006,7 +1056,7 @@ function fusionOdds(a, b) {
   const ca = COLORS[a.c], cb = COLORS[b.c];
   if (a.c === b.c) return { same: true };
   const rar = Math.max(ca.rar, cb.rar);
-  const up = rar >= 4 ? 0 : ca.rar === cb.rar ? 0.35 : 0.2;
+  const up = rar >= 5 ? 0 : rar === 4 ? (ca.rar === 4 && cb.rar === 4 ? 0.1 : 0) : ca.rar === cb.rar ? 0.35 : 0.2;
   return { rar, up };
 }
 function hueBlend(ca, cb) {
@@ -1101,7 +1151,7 @@ function renderHatch() {
   $('sheetTitle').textContent = '🥚 부화';
   $('sheetBody').innerHTML = `<div class="center">
     <canvas id="eggCv" width="220" height="220" style="width:180px;height:180px;position:static;margin:0 auto"></canvas>
-    <p class="hint">불사조의 알을 부화하면 200가지 색 중 하나가 새끼 불사조로 태어나요.</p>
+    <p class="hint">불사조의 알을 부화하면 200가지 색 중 하나가 새끼 불사조로 태어나요. 신 등급 10종은 상점의 신의 알, 50스테이지마다 나오는 신의 보스, 천공의 성역 탐험, 신화끼리의 합성으로 얻을 수 있어요.</p>
     <div class="row"><button id="egg1" class="primary">알 1개 부화 (100🔥)</button><button id="egg10" class="primary">10연 부화 (900🔥)</button></div>
     <p class="odds" style="margin-top:12px">${RARITY.map((r, i) => `<span style="color:${RARITY_COL[i]}">${r} ${EGG_W[i]}%</span>`).join(' · ')}<br>신화 10종(흑염·백염·무지개·은하·황혼·태초·심연·오로라·성운·불멸)은 부화, 합성 승급, 보스 포획, 천공의 성역 탐험으로 얻을 수 있어요.</p>
   </div>`;
@@ -1163,7 +1213,7 @@ function renderDex() {
   $('sheetTools').innerHTML = '';
   const n = G.dex.reduce((a, b) => a + b, 0);
   $('sheetTitle').textContent = `📖 도감 ${n} / ${NCOL}`;
-  $('sheetBody').innerHTML = `<p class="hint">200가지 색의 불사조. 발견한 색은 밝게 표시돼요. 도감 10종마다 보상을 받을 수 있어요.</p>
+  $('sheetBody').innerHTML = `<p class="hint">200가지 색 + 신 등급 10종. 발견한 불사조는 밝게 표시돼요. 도감 10종마다 보상을 받을 수 있어요.</p>
     <div class="grid">${COLORS.map((C) => {
       const known = G.dex[C.id];
       return `<div class="card-ph ${known ? '' : 'unknown'}" style="border-color:${known ? RARITY_COL[C.rar] : '#333'};cursor:default">
@@ -1201,6 +1251,7 @@ function renderBattlePrep() {
     <p class="odds">아군 전투력 ${fmt(pw)} · 적 예상: ${preview.n}마리, Lv.${preview.lv} 전후${N % 5 === 0 ? ', 보스 1마리' : ''}<br>
     최고 기록 스테이지 ${G.best} · 승리하면 다음 스테이지가 열리고, 야생 불사조를 포획할 수 있어요.</p>
     <label class="odds"><input type="checkbox" id="autoNext" ${G.autoNext ? 'checked' : ''}> 승리하면 자동으로 다음 스테이지 진행</label>
+    <div class="odds" style="margin-top:8px">전투 아이템 (전투마다 1개씩 소모): ${BATTLE_ITEMS.map((it) => `<label style="margin:0 6px;white-space:nowrap;${inv(it.id) ? '' : 'opacity:.4'}"><input type="checkbox" data-bi="${it.id}" ${inv(it.id) && G.useNext && G.useNext[it.id] ? 'checked' : ''} ${inv(it.id) ? '' : 'disabled'}> ${it.icon}${it.name} ×${inv(it.id)}</label>`).join('')}<br><span>아이템은 🛒 상점에서 살 수 있어요.</span></div>
     <div class="row"><button id="goBattle" class="primary" ${pt.length ? '' : 'disabled'}>⚔️ 전투 시작</button></div>
     <p class="hint" style="margin-top:14px">출전 불사조 (보관함에서 출전·해제)</p>
   </div>
@@ -1211,7 +1262,116 @@ function renderBattlePrep() {
   $('stNext').onclick = () => { G.stage = N + 1; renderBattlePrep(); };
   $('autoNext').onchange = (e) => { G.autoNext = e.target.checked; save(); };
   $('goBattle').onclick = () => startBattle(N);
+  for (const cb of $('sheetBody').querySelectorAll('[data-bi]')) cb.onchange = () => { G.useNext = G.useNext || {}; G.useNext[cb.dataset.bi] = cb.checked; save(); };
   for (const el of $('sheetBody').querySelectorAll('.card-ph')) el.onclick = () => showDetail(byUid(+el.dataset.uid));
+}
+
+// ============================================================
+// shop & items
+// ============================================================
+const ITEMS = [
+  { id: 'exp_s', name: '경험치 물약', icon: '🧪', price: 80, use: 'ph', desc: '불사조 1마리 경험치 +300' },
+  { id: 'exp_l', name: '큰 경험치 물약', icon: '⚗️', price: 350, use: 'ph', desc: '불사조 1마리 경험치 +1,500' },
+  { id: 'bond', name: '유대의 깃털', icon: '🪶', price: 150, use: 'ph', desc: '불사조 1마리 유대 +20' },
+  { id: 'star', name: '별의 조각', icon: '⭐', price: 1500, use: 'ph', desc: '불사조 1마리 별 +1 (최대 5, 별당 능력치 +12%)' },
+  { id: 'stam', name: '기력 물약', icon: '⚡', price: 90, use: 'now', desc: '탐험 기력 +10' },
+  { id: 'bait', name: '황금 먹이', icon: '🍯', price: 60, use: 'explore', desc: '탐험에서 야생 불사조에게 사용: 포획 판정 범위 +60%' },
+  { id: 'charm', name: '길들이기 부적', icon: '🧿', price: 250, use: 'explore', desc: '탐험에서 사용: 포획 게이지가 40%에서 시작' },
+  { id: 'atk', name: '분노의 비약', icon: '💢', price: 200, use: 'battle', desc: '전투 1회 동안 아군 공격력 +30%' },
+  { id: 'def', name: '수호의 비약', icon: '🛡️', price: 200, use: 'battle', desc: '전투 1회 동안 아군 방어력 +30%' },
+  { id: 'rev', name: '불사의 깃털', icon: '🕊️', price: 400, use: 'battle', desc: '전투 1회 동안 모든 아군이 한 번 더 부활' },
+  { id: 'ult', name: '폭풍의 핵', icon: '🌪️', price: 300, use: 'battle', desc: '전투 시작부터 피닉스 폭풍 게이지 100%' },
+  { id: 'luck_egg', name: '행운의 알', icon: '🥚', price: 1500, use: 'now', desc: '영웅 등급 이상 확정 부화' },
+  { id: 'myth_egg', name: '신화의 알', icon: '🌈', price: 8000, use: 'now', desc: '신화 등급 확정 부화' },
+  { id: 'god_egg', name: '신의 알', icon: '👑', price: 30000, use: 'now', desc: '신 등급 불사조 확정 부화 (10종 중 하나)' },
+];
+const ITEM = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+const BATTLE_ITEMS = ITEMS.filter((i) => i.use === 'battle');
+const inv = (id) => (G.inv && G.inv[id]) || 0;
+function addItem(id, n) {
+  G.inv = G.inv || {};
+  G.inv[id] = (G.inv[id] || 0) + n;
+  if (G.inv[id] <= 0) delete G.inv[id];
+}
+const USE_WHERE = { ph: '불사조에게 사용', now: '바로 사용', explore: '탐험 포획 때 사용', battle: '전투 준비에서 사용' };
+function renderShop() {
+  $('sheetTools').innerHTML = '';
+  $('sheetTitle').textContent = '🛒 상점';
+  const owned = ITEMS.filter((i) => inv(i.id) > 0);
+  $('sheetBody').innerHTML = `<p class="hint">불씨로 아이템을 사서 가방에 보관하세요. 보유 불씨 🔥 <b>${fmt(G.coins)}</b></p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${ITEMS.map((it) => `
+      <div class="card-ph" style="border-color:${it.price >= 8000 ? '#fff1a0' : it.price >= 1000 ? '#ffb347' : '#6a4a3a'};text-align:left;padding:10px;cursor:default">
+        <div class="nm" style="font-size:15px">${it.icon} ${it.name} <span class="sub">(보유 ${inv(it.id)})</span></div>
+        <div class="sub" style="margin:4px 0 6px;min-height:30px">${it.desc}<br><i>${USE_WHERE[it.use]}</i></div>
+        <div class="row" style="justify-content:flex-start;margin-top:4px">
+          <button data-buy="${it.id}" data-n="1" ${G.coins < it.price ? 'disabled' : ''}>🔥${fmt(it.price)} 구매</button>
+          ${it.price <= 400 ? `<button data-buy="${it.id}" data-n="10" ${G.coins < it.price * 10 ? 'disabled' : ''}>×10 (🔥${fmt(it.price * 10)})</button>` : ''}
+        </div></div>`).join('')}</div>
+    <h3 style="color:var(--accent);margin:18px 0 8px">🎒 가방</h3>
+    ${owned.length ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${owned.map((it) => `
+      <div class="card-ph" style="border-color:#6a4a3a;text-align:left;padding:10px;cursor:default">
+        <div class="nm" style="font-size:15px">${it.icon} ${it.name} ×${inv(it.id)}</div>
+        <div class="sub" style="margin:4px 0 6px">${it.desc}</div>
+        ${it.use === 'ph' || it.use === 'now' ? `<button class="primary" data-use="${it.id}">사용하기</button>` : `<span class="sub"><i>${USE_WHERE[it.use]}</i></span>`}
+      </div>`).join('')}</div>` : '<p class="hint">가방이 비어 있어요.</p>'}`;
+  for (const b of $('sheetBody').querySelectorAll('[data-buy]')) b.onclick = () => buyItem(b.dataset.buy, +b.dataset.n);
+  for (const b of $('sheetBody').querySelectorAll('[data-use]')) b.onclick = () => useItem(b.dataset.use);
+}
+function buyItem(id, n) {
+  const it = ITEM[id], cost = it.price * n;
+  if (G.coins < cost) return toast('불씨가 부족해요');
+  G.coins -= cost;
+  addItem(id, n);
+  SFX.pick();
+  toast(`${it.icon} ${it.name} ×${n} 구매!`);
+  save(); renderShop(); updateTop();
+}
+function pickPhoenix(title, fn) {
+  const list = G.ph.slice().sort(SORTS.power);
+  showModal(title, `<p class="odds">사용할 불사조를 고르세요</p><div class="grid" style="max-height:55vh;overflow:auto">${list.map((p) => cardHTML(p)).join('')}</div>`, [{ label: '취소' }]);
+  for (const el of $('mBody').querySelectorAll('.card-ph')) el.onclick = () => { closeModal(); fn(byUid(+el.dataset.uid)); };
+}
+function useItem(id) {
+  const it = ITEM[id];
+  if (!inv(id)) return;
+  if (it.use === 'ph') return pickPhoenix(`${it.icon} ${it.name} 사용`, (p) => applyToPhoenix(id, p));
+  if (id === 'stam') {
+    if (stam() >= STAM_MAX) return toast('탐험 기력이 이미 가득해요');
+    G.stam = Math.min(STAM_MAX, stam() + 10);
+    addItem(id, -1);
+    toast('⚡ 탐험 기력 +10');
+  } else {
+    const rar = id === 'god_egg' ? 5 : id === 'myth_egg' ? 4 : (Math.random() < 0.7 ? 2 : Math.random() < 0.85 ? 3 : 4);
+    const cid = randomColorOf(rar);
+    const isNew = !G.dex[cid];
+    const p = addPhoenix({ c: cid, st: 0, lv: 1 });
+    addItem(id, -1);
+    const C = COLORS[cid];
+    SFX.evolve();
+    showModal(`${it.icon} ${it.name} 부화!`, `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${bigURL(p.c, 0)}" alt=""></div>
+      <p><b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> ${esc(C.name)}${isNew ? ' <b style="color:#ffd04a">NEW!</b>' : ''}</p>`, [{ label: '확인', primary: true }]);
+  }
+  save(); renderShop(); updateTop();
+}
+function applyToPhoenix(id, p) {
+  const it = ITEM[id];
+  let msg = '';
+  if (id === 'star') {
+    if (p.star >= 5) return toast('이미 별이 최대(5)예요');
+    p.star++; msg = `별 ★${p.star}`;
+  } else if (id === 'bond') {
+    if (p.bond >= 100) return toast('이미 완전히 길들여졌어요');
+    bondGain(p, 20); msg = `유대 ${Math.floor(p.bond)}`;
+  } else {
+    if (p.lv >= LV_CAP[p.st]) return toast(p.st < 2 ? '레벨 상한이에요. 불씨로 진화시켜 주세요' : '이미 최대 레벨이에요');
+    const before = p.lv;
+    addExp(p, id === 'exp_l' ? 1500 : 300);
+    msg = p.lv > before ? `레벨 업! Lv.${before} → Lv.${p.lv}` : '경험치 획득';
+  }
+  addItem(id, -1);
+  SFX.good();
+  toast(`${it.icon} ${nameOf(p)}: ${msg}`);
+  save(); if (tab === 'shop') renderShop(); updateTop();
 }
 
 // ============================================================
@@ -1269,7 +1429,7 @@ function startExplore(ri) {
   exploreUI();
 }
 function genWild(R) {
-  const rar = rollRarity(R.rb);
+  const rar = R.rb >= 0.45 && Math.random() < 0.012 ? 5 : rollRarity(R.rb);
   let pool = COLORS.filter((c) => c.rar === rar && (!R.elem || c.elem === R.elem || c.elem === 'holy'));
   if (!pool.length || Math.random() < 0.2) pool = COLORS.filter((c) => c.rar === rar);
   const lv = Math.floor(rand(R.lv[0], R.lv[1] + 1));
@@ -1277,7 +1437,7 @@ function genWild(R) {
   return { c: pick(pool).id, st, lv: Math.min(lv, LV_CAP[st]), star: 0, bond: 0 };
 }
 const capNeed = () => 60 + COLORS[X.wild.c].rar * 12;
-const capTol = () => (24 - COLORS[X.wild.c].rar * 3) * (1 + 0.3 * X.bait);
+const capTol = () => Math.max(6, 24 - COLORS[X.wild.c].rar * 3) * (1 + 0.3 * X.bait + (X.gold ? 0.6 : 0));
 const capTarget = () => 70 * Math.max(0.7, S);
 function exploreUI() {
   const R = REGIONS[X.ri];
@@ -1296,6 +1456,8 @@ function exploreUI() {
   else if (X.phase === 'encounter') {
     add('🎯 포획 시도', startCapture, true);
     add(`🍖 먹이 던지기 (20🔥)${X.bait ? ` ×${X.bait}` : ''}`, throwBait, false, G.coins < 20 || X.bait >= 3);
+    if (inv('bait') && !X.gold) add(`🍯 황금 먹이 (${inv('bait')})`, () => { addItem('bait', -1); X.gold = true; X.msg = '황금 먹이에 불사조가 마음을 연다! (판정 범위 +60%)'; SFX.eat(); save(); exploreUI(); });
+    if (inv('charm') && !X.charm) add(`🧿 길들이기 부적 (${inv('charm')})`, () => { addItem('charm', -1); X.charm = true; X.msg = '부적이 빛난다! 포획 게이지가 40%에서 시작해요.'; SFX.good(); save(); exploreUI(); });
     add('🏃 도망치기', () => { X.phase = 'idle'; X.wild = null; X.msg = '조용히 자리를 떴다…'; exploreUI(); });
   }
   $('xBack').disabled = X.phase === 'capture' || X.phase === 'walk';
@@ -1313,7 +1475,7 @@ function resolveExplore() {
   const r = Math.random();
   if (r < 0.68) {
     X.wild = genWild(R);
-    X.phase = 'encounter'; X.appear = 0; X.bait = 0; X.gauge = 0; X.tries = 0;
+    X.phase = 'encounter'; X.appear = 0; X.bait = 0; X.gold = false; X.charm = false; X.gauge = 0; X.tries = 0;
     const C = COLORS[X.wild.c];
     X.msg = `야생 <b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> <b>${esc(C.name)}</b> (${STAGE_NAMES[X.wild.st]} Lv.${X.wild.lv})이(가) 나타났다!${G.dex[C.id] ? '' : ' <b style="color:#ffd04a">미발견!</b>'}`;
     SFX.chirp(X.wild.st);
@@ -1351,7 +1513,7 @@ function throwBait() {
   exploreUI();
 }
 function startCapture() {
-  X.phase = 'capture'; X.tries = 0; X.gauge = 0;
+  X.phase = 'capture'; X.tries = 0; X.gauge = X.charm ? capNeed() * 0.4 : 0;
   X.ring = capTarget() * 3.2; X.wait = 0.5; X.judge = null;
   X.msg = '고리가 금빛 원에 겹칠 때 탭 / 스페이스! (3번의 기회)';
   exploreUI();
@@ -1455,7 +1617,8 @@ function drawExplore() {
     const k = (hh / img.height) * (0.6 + 0.4 * a);
     const ww = img.width * k, h2 = img.height * k;
     glow(cx, cy, hh * 0.75, C.glow, 0.45 * a);
-    if (C.rar >= 3) glow(cx, cy, hh * (0.9 + 0.1 * Math.sin(T * 4)), RARITY_COL[C.rar] === '#ffb347' ? '255,180,70' : '255,90,130', 0.3 * a);
+    if (C.rar >= 3) glow(cx, cy, hh * (0.9 + 0.1 * Math.sin(T * 4)), C.rar === 3 ? '255,180,70' : C.rar === 4 ? '255,90,130' : '255,236,150', 0.3 * a);
+    if (C.rar === 5) drawHalo(cx, cy, hh * 0.55, a);
     ctx.save();
     ctx.globalAlpha = a;
     ctx.translate(cx, cy + Math.sin(T * 2.5) * hh * 0.02);
@@ -1508,6 +1671,8 @@ function drawExplore() {
 let B = null;
 const ADV = { fire: 'wind', wind: 'water', water: 'fire' };
 function elemMult(a, d) {
+  if (a === 'divine') return d === 'divine' ? 1 : 1.35;
+  if (d === 'divine') return 0.8;
   if (a === 'holy') return d === 'holy' ? 1 : 1.25;
   if (a === 'spirit') return d === 'spirit' ? 1.2 : d === 'holy' ? 0.85 : 1.1;
   if (d === 'holy') return 0.85;
@@ -1530,7 +1695,7 @@ function genEnemies(N, partyN) {
   }
   if (N % 5 === 0) {
     const lv = Math.min(50, plan.lv + 3), st = lv >= 25 ? 2 : lv >= 10 ? 1 : 0;
-    list.unshift({ c: randomColorOf(N % 25 === 0 ? 4 : Math.min(4, 3 + (Math.random() < N / 100 ? 1 : 0))), st, lv: Math.min(lv, LV_CAP[st]), star: Math.min(5, Math.floor(N / 15)), bond: 100, uid: -999, boss: true });
+    list.unshift({ c: randomColorOf(N % 50 === 0 ? 5 : N % 25 === 0 ? 4 : Math.min(4, 3 + (Math.random() < N / 100 ? 1 : 0))), st, lv: Math.min(lv, LV_CAP[st]), star: Math.min(5, Math.floor(N / 15)), bond: 100, uid: -999, boss: true });
   }
   return list;
 }
@@ -1546,6 +1711,16 @@ function startBattle(N) {
   if (!pt.length) return toast('출전할 불사조를 먼저 고르세요');
   B = { N, t: 0, allies: pt.map((p) => mkUnit(p, 0)), foes: genEnemies(N, pt.length).map((p) => mkUnit(p, 1)), shots: [], gauge: [0, 0], over: false, aiUltDelay: rand(1, 3), storm: 0 };
   B.many = B.allies.length + B.foes.length > 30;
+  B.buff = {};
+  const used = [];
+  for (const it of BATTLE_ITEMS) {
+    if (G.useNext && G.useNext[it.id] && inv(it.id) > 0) { B.buff[it.id] = true; addItem(it.id, -1); used.push(it.icon); }
+  }
+  if (B.buff.atk) for (const u of B.allies) u.atk = Math.round(u.atk * 1.3);
+  if (B.buff.def) for (const u of B.allies) u.def = Math.round(u.def * 1.3);
+  if (B.buff.ult) B.gauge[0] = 100;
+  if (used.length) setTimeout(() => toast(`아이템 사용: ${used.join(' ')}`, 1.6), 1600);
+  save();
   mode = 'battle';
   closeModal();
   layoutBattle();
@@ -1658,6 +1833,12 @@ function dealDamage(f, dmg, fromSide, em = 1, crit = false) {
       emit(f.x, f.y, 40, { color: f.glow, smin: 80, smax: 260, rise: 40 });
       if (!B.many || Math.random() < 0.3) floatText(f.x, f.y - f.s * 0.6, '🔥 부활!', '#ffb347', 18);
       SFX.heal();
+    } else if (f.side === 0 && B.buff && B.buff.rev && !f.itemRev) {
+      f.itemRev = true;
+      f.hp = Math.round(f.max * 0.5);
+      emit(f.x, f.y, 40, { color: '255,255,230', smin: 80, smax: 260, rise: 40 });
+      if (!B.many || Math.random() < 0.3) floatText(f.x, f.y - f.s * 0.6, '🕊️ 부활!', '#ffffff', 18);
+      SFX.heal();
     } else {
       f.hp = 0; f.dead = true;
       emit(f.x, f.y, 26, { color: '120,110,110', smin: 20, smax: 110, rise: 30, lmax: 1.5 });
@@ -1727,6 +1908,7 @@ function drawUnit(u) {
   const bob = Math.sin(T * 3 + u.x * 0.05) * u.s * 0.02;
   const x = u.x + dir * u.lunge * u.s * 0.25, y = u.y + bob;
   if (u.boss) glow(x, y, u.s * 0.8, '255,60,60', 0.35);
+  if (!u.dead && COLORS[u.p.c].rar === 5) drawHalo(x, y, u.s * 0.46, u.fade);
   ctx.save();
   ctx.globalAlpha = u.fade;
   ctx.translate(x, y);
@@ -1851,7 +2033,7 @@ function endBattle(win) {
   let ups = 0, capped = 0;
   for (const u of B.allies) {
     ups += addExp(u.p, each) ? 1 : 0;
-    if (canEvolve(u.p)) capped++;
+    if (u.p.st < 2 && u.p.lv >= LV_CAP[u.p.st]) capped++;
     u.p.bond = clamp(u.p.bond + (win ? 1 : 0.3), 0, 100);
   }
   G.coins += coins;
@@ -1871,7 +2053,7 @@ function endBattle(win) {
   save();
   let html = `<p>${win ? '🎉 AI 불사조 군단을 물리쳤어요!' : '아군이 모두 쓰러졌어요. 불사조는 잿더미에서 다시 일어납니다.'}</p>
     <p>불씨 +${coins} · 출전 불사조 각각 경험치 +${each}${ups ? ` · 레벨 업 ${ups}마리` : ''}</p>`;
-  if (capped) html += `<p style="color:#ffd04a">✨ 진화 가능한 불사조가 ${capped}마리 있어요! (보관함)</p>`;
+  if (capped) html += `<p style="color:#ffd04a">✨ 레벨 상한에 도달한 불사조 ${capped}마리 — 불씨로 진화시키면 더 강해져요! (보관함)</p>`;
   if (capture) {
     const C = COLORS[capture.p.c];
     html += `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${thumbURL(capture.p.c, capture.p.st)}" alt="" style="height:120px"></div>
