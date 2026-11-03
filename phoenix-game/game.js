@@ -1090,7 +1090,7 @@ function showDetail(p) {
       <tr><td>유대</td><td>${Math.floor(p.bond)} / 100${p.bond >= 100 ? ' 💖' : ''}</td></tr>
       <tr><td>전투력</td><td><b>${fmt(s.power)}</b></td></tr>
     </table>
-    <p class="odds">${evoTxt}<br>스킬: 불꽃 쪼기${p.st >= 1 ? ' · 화염 날개(광역)' : ''}${p.st >= 2 ? ' · 불사조의 축복(회복) · 부활(1회)' : ''}</p>
+    <p class="odds">${evoTxt}<br>스킬: 불꽃 쪼기${p.st >= 1 ? ' · 화염 날개(광역)' : ''}${p.st >= 2 ? ' · 부활(1회)' : ''}</p>
     <p><input class="txt" id="nickIn" maxlength="10" placeholder="별명 짓기" value="${esc(p.nick)}"></p>`;
   const btns = [
     { label: p.party ? '⚔️ 출전 해제' : `⚔️ 출전 (${party().length}/${PARTY_MAX})`, fn: () => { setParty(p, !p.party); save(); refreshAfter(); } },
@@ -1805,7 +1805,7 @@ function mkUnit(p, side) {
   const m = side === 1 ? diff().mul : 1;
   const hp = Math.round((boss ? s.hp * 1.8 : s.hp) * m);
   return { p, side, boss, hp, max: hp, atk: Math.round(s.atk * m), def: Math.round(s.def * m), spd: side === 1 ? s.spd * (0.85 + 0.15 * m) : s.spd, elem: COLORS[p.c].elem, glow: COLORS[p.c].glow,
-    atb: Math.random() * 0.6, cd1: 1, cd2: 2, revived: false, dead: false, fade: 1, lunge: 0, flash: 0, x: 0, y: 0, s: 50 };
+    atb: Math.random() * 0.6, cd1: 1, revived: false, dead: false, fade: 1, lunge: 0, flash: 0, x: 0, y: 0, s: 50 };
 }
 function startBattle(N) {
   const pt = party();
@@ -1880,24 +1880,9 @@ function chooseTarget(u, foes) {
   return best;
 }
 function act(u) {
-  const mine = u.side === 0 ? B.allies : B.foes, theirs = u.side === 0 ? B.foes : B.allies;
-  const foes = alive(theirs), friends = alive(mine);
+  const foes = alive(u.side === 0 ? B.foes : B.allies);
   if (!foes.length) return;
-  u.cd1--; u.cd2--;
-  const hurt = friends.filter((f) => f.hp / f.max < 0.55);
-  if (u.p.st === 2 && u.cd2 <= 0 && hurt.length >= Math.max(1, Math.ceil(friends.length * 0.25))) {
-    u.cd2 = 4;
-    SFX.heal();
-    const amt = u.atk * 1.4;
-    for (const f of friends) {
-      const h = Math.round(Math.min(f.max - f.hp, amt));
-      f.hp += h;
-      if (h > 0 && fancy()) floatText(f.x, f.y - f.s * 0.4, '+' + h, '#8aff9a', 14);
-      if (h > 0) emit(f.x, f.y, fancy() ? 4 : 2, { color: '140,255,160', smin: 20, smax: 70, rise: 60 });
-    }
-    if (fancy()) floatText(u.x, u.y - u.s * 0.55, '불사조의 축복', '#8aff9a', 15);
-    return;
-  }
+  u.cd1--;
   if (u.p.st >= 1 && u.cd1 <= 0 && foes.length >= 2) {
     u.cd1 = 3;
     u.lunge = 1;
