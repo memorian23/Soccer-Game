@@ -248,7 +248,9 @@ const bigURL = (cid, st) => colored(cid, st, false).toDataURL('image/png');
 // ============================================================
 // phoenix model
 // ============================================================
-const LV_CAP = [15, 30, 50];
+const LV_CAP = [50, 60, 70]; // 새끼·청년·어른 level caps (eggs hatch at Lv.40+)
+const HATCH_LV = [40, 45]; // hatched phoenixes start between these levels
+const hatchLevel = () => HATCH_LV[0] + Math.floor(Math.random() * (HATCH_LV[1] - HATCH_LV[0] + 1));
 const EVO = [{ cost: 50 }, { cost: 150 }]; // evolution needs only 불씨
 const RAR_MUL = [1, 1.15, 1.32, 1.55, 1.85, 2.3];
 const STAGE_MUL = [1, 1.55, 2.2];
@@ -1212,7 +1214,7 @@ function renderHatch() {
   $('sheetTitle').textContent = '🥚 부화';
   $('sheetBody').innerHTML = `<div class="center">
     <canvas id="eggCv" width="220" height="220" style="width:180px;height:180px;position:static;margin:0 auto"></canvas>
-    <p class="hint">가지고 있는 알은 모두 공짜로 부화해요. 부화하면 200가지 색 중 하나가 새끼 불사조로 태어나요. 신 등급 10종은 상점의 신의 알, 50스테이지마다 나오는 신의 보스, 천공의 성역 탐험, 신화끼리의 합성으로 얻을 수 있어요.</p>
+    <p class="hint">가지고 있는 알은 모두 공짜로 부화해요. 부화하면 200가지 색 중 하나가 <b>Lv.40~45</b> 새끼 불사조로 태어나요. 신 등급 10종은 상점의 신의 알, 50스테이지마다 나오는 신의 보스, 천공의 성역 탐험, 신화끼리의 합성으로 얻을 수 있어요.</p>
     <h3 style="color:var(--accent);margin:10px 0 8px">🥚 보유한 알 — 공짜로 부화</h3>
     ${EGG_IDS.some((id) => inv(id)) ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));text-align:left">${EGG_IDS.filter((id) => inv(id)).map((id) => `
       <div class="card-ph" style="border-color:${id === 'god_egg' || id === 'myth_egg' ? '#fff1a0' : id === 'luck_egg' ? '#ffb347' : '#6a4a3a'};padding:10px;cursor:default;text-align:left">
@@ -1281,17 +1283,17 @@ function hatchEggs(id, n) {
   for (let i = 0; i < n; i++) {
     const cid = randomColorOf(eggRarity(id));
     const isNew = !G.dex[cid];
-    got.push({ p: addPhoenix({ c: cid, st: 0, lv: 1, party: false }), isNew });
+    got.push({ p: addPhoenix({ c: cid, st: 0, lv: hatchLevel(), party: false }), isNew });
   }
   save();
   SFX.evolve();
   let html;
   if (n === 1) {
     const { p, isNew } = got[0], C = COLORS[p.c];
-    html = `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${bigURL(p.c, 0)}" alt=""></div><p><b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> ${esc(C.name)}${isNew ? ' <b style="color:#ffd04a">NEW!</b>' : ''}</p>`;
+    html = `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${bigURL(p.c, 0)}" alt=""></div><p><b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> ${esc(C.name)} · <b>Lv.${p.lv}</b>${isNew ? ' <b style="color:#ffd04a">NEW!</b>' : ''}</p>`;
   } else {
     const shown = got.slice().sort((a, b) => COLORS[b.p.c].rar - COLORS[a.p.c].rar || b.isNew - a.isNew).slice(0, 120);
-    html = (n > 120 ? `<p class="odds">희귀한 순으로 120마리만 보여 줘요 (총 ${fmt(n)}마리)</p>` : '') + `<div class="reveal-grid">${shown.map(({ p, isNew }, i) => { const C = COLORS[p.c]; return `<div style="border-color:${RARITY_COL[C.rar]};animation-delay:${Math.min(i * 0.08, 0.8 + i * 0.01).toFixed(2)}s"><img src="${thumbURL(p.c, 0)}" alt="">${esc(C.short)}${isNew ? '<br><b style="color:#ffd04a">NEW</b>' : ''}</div>`; }).join('')}</div>`;
+    html = (n > 120 ? `<p class="odds">희귀한 순으로 120마리만 보여 줘요 (총 ${fmt(n)}마리)</p>` : '') + `<div class="reveal-grid">${shown.map(({ p, isNew }, i) => { const C = COLORS[p.c]; return `<div style="border-color:${RARITY_COL[C.rar]};animation-delay:${Math.min(i * 0.08, 0.8 + i * 0.01).toFixed(2)}s"><img src="${thumbURL(p.c, 0)}" alt="">${esc(C.short)}<br>Lv.${p.lv}${isNew ? '<br><b style="color:#ffd04a">NEW</b>' : ''}</div>`; }).join('')}</div>`;
   }
   showModal(n === 1 ? `${ITEM[id].icon} 부화!` : `${ITEM[id].icon} ${fmt(n)}개 부화!`, html + '<p class="odds">새 불사조는 보관함에 들어갔어요. 보관함에서 출전시킬 수 있어요.</p>', [{ label: '확인', primary: true, fn: renderHatch }]);
   updateTop();
@@ -1787,12 +1789,12 @@ function genEnemies(N, partyN) {
   const plan = enemyPlan(N, partyN);
   const list = [];
   for (let i = 0; i < plan.n; i++) {
-    const lv = clamp(plan.lv + Math.floor(rand(-1, 1)), 1, 50);
+    const lv = clamp(plan.lv + Math.floor(rand(-1, 1)), 1, 70);
     const st = lv >= 32 ? 2 : lv >= 16 ? 1 : 0;
     list.push({ c: randomColorOf(rollRarity(Math.min(0.35, N / 120))), st, lv: Math.min(lv, LV_CAP[st]), star: N > 60 ? Math.floor(rand(0, Math.min(3, N / 40))) : 0, bond: 0, uid: -i - 1 });
   }
   if (N % 5 === 0) {
-    const lv = Math.min(50, plan.lv + 1), st = lv >= 32 ? 2 : lv >= 16 ? 1 : 0;
+    const lv = Math.min(70, plan.lv + 1), st = lv >= 32 ? 2 : lv >= 16 ? 1 : 0;
     list.unshift({ c: randomColorOf(N % 50 === 0 ? 5 : N % 25 === 0 ? 4 : Math.min(4, 3 + (Math.random() < N / 100 ? 1 : 0))), st, lv: Math.min(lv, LV_CAP[st]), star: Math.min(3, Math.floor(N / 30)), bond: 0, uid: -999, boss: true });
   }
   return list;
