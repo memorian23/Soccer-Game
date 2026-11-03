@@ -301,6 +301,34 @@ function rep() {
   return p;
 }
 const party = () => G.ph.filter((p) => p.party);
+const PARTY_MAX = 5;
+// put p in (or out of) the battle party; refuses when the party is already full
+function setParty(p, on) {
+  if (on && !p.party && party().length >= PARTY_MAX) { toast(`출전은 최대 ${PARTY_MAX}마리까지예요. 다른 불사조를 먼저 빼 주세요`); return false; }
+  p.party = on;
+  return true;
+}
+// strongest possible team: top PARTY_MAX by power
+function bestParty() {
+  const top = G.ph.slice().sort(SORTS.power).slice(0, PARTY_MAX);
+  for (const p of G.ph) p.party = false;
+  for (const p of top) p.party = true;
+  return top;
+}
+// keep old saves (or merges) within the limit by keeping the strongest
+function trimParty() {
+  const pt = party();
+  if (pt.length <= PARTY_MAX) return;
+  pt.sort(SORTS.power).slice(PARTY_MAX).forEach((p) => (p.party = false));
+}
+function bestPartyAction(after) {
+  const top = bestParty();
+  save();
+  SFX.good();
+  toast(`💪 가장 센 편성: ${top.length}마리 · 전투력 ${fmt(top.reduce((a, p) => a + statsOf(p).power, 0))}`, 2.5);
+  after();
+  updateTop();
+}
 
 function addExp(p, n) {
   let ups = 0;
@@ -509,7 +537,7 @@ function updateTop() {
   $('coins').textContent = fmt(G.coins);
   $('bestStage').textContent = G.best;
   $('owned').textContent = G.ph.length;
-  $('partyN').textContent = party().length;
+  $('partyN').textContent = `${party().length}/${PARTY_MAX}`;
   $('dexN').textContent = G.dex.reduce((a, b) => a + b, 0) + ' / ' + NCOL;
   $('mute').textContent = G.muted ? '🔇' : '🔊';
   const p = rep();
@@ -1005,13 +1033,13 @@ function sortFilterTools(onChange) {
 // ---------------- 보관함 ----------------
 function renderStorage() {
   $('sheetTools').innerHTML = '';
-  $('sheetTitle').textContent = `📦 보관함 (${G.ph.length}마리 · 무제한)`;
+  $('sheetTitle').textContent = `📦 보관함 (${G.ph.length}마리 · 보관 무제한 · 출전 ${party().length}/${PARTY_MAX})`;
   sortFilterTools(renderStorage);
-  tool('모두 출전', () => { filtered().forEach((p) => (p.party = true)); save(); renderStorage(); updateTop(); });
-  tool('모두 대기', () => { filtered().forEach((p) => (p.party = false)); save(); renderStorage(); updateTop(); });
+  tool('💪 가장 센 편성', () => bestPartyAction(renderStorage), 'primary');
+  tool('모두 대기', () => { G.ph.forEach((p) => (p.party = false)); save(); renderStorage(); updateTop(); });
   tool('✨ 모두 진화', evolveAll, 'primary');
   const list = filtered();
-  $('sheetBody').innerHTML = `<p class="hint">불사조를 눌러 상세 정보를 보고 출전·대표·진화·방생을 할 수 있어요. 출전 수와 보관 수에는 제한이 없습니다.</p>` +
+  $('sheetBody').innerHTML = `<p class="hint">불사조를 눌러 상세 정보를 보고 출전·대표·진화·방생을 할 수 있어요. 출전은 최대 5마리, 보관은 제한이 없어요. '가장 센 편성'을 누르면 전투력이 가장 높은 5마리가 자동으로 출전해요.</p>` +
     (list.length ? `<div class="grid">${list.map((p) => cardHTML(p)).join('')}</div>` : '<p class="hint">해당하는 불사조가 없어요.</p>');
   for (const el of $('sheetBody').querySelectorAll('.card-ph')) el.onclick = () => showDetail(byUid(+el.dataset.uid));
 }
@@ -1063,7 +1091,7 @@ function showDetail(p) {
     <p class="odds">${evoTxt}<br>스킬: 불꽃 쪼기${p.st >= 1 ? ' · 화염 날개(광역)' : ''}${p.st >= 2 ? ' · 불사조의 축복(회복) · 부활(1회)' : ''}</p>
     <p><input class="txt" id="nickIn" maxlength="10" placeholder="별명 짓기" value="${esc(p.nick)}"></p>`;
   const btns = [
-    { label: p.party ? '⚔️ 출전 해제' : '⚔️ 출전', fn: () => { p.party = !p.party; save(); refreshAfter(); } },
+    { label: p.party ? '⚔️ 출전 해제' : `⚔️ 출전 (${party().length}/${PARTY_MAX})`, fn: () => { setParty(p, !p.party); save(); refreshAfter(); } },
     { label: '👑 대표로', disabled: p.uid === G.rep, fn: () => { G.rep = p.uid; save(); toast(`${nameOf(p)}이(가) 대표 불사조가 되었어요`); refreshAfter(); } },
   ];
   if (p.st < 2) btns.push({ label: `✨ 진화 (${EVO[p.st].cost}🔥)`, primary: true, disabled: !canEvolve(p) || G.coins < EVO[p.st].cost, fn: () => actEvolve(p) });
@@ -1117,6 +1145,7 @@ function doFuse(a, b) {
   const lv = Math.min(LV_CAP[st], Math.max(a.lv, b.lv));
   G.ph = G.ph.filter((p) => p !== a && p !== b);
   const np = addPhoenix({ c: cid, st, lv, star, bond: Math.max(a.bond, b.bond), party: a.party || b.party });
+  trimParty();
   if (wasRep) G.rep = np.uid;
   return { np, upgraded, isNew };
 }
@@ -1302,7 +1331,7 @@ function renderBattlePrep() {
   G.stage = N;
   const preview = enemyPlan(N, pt.length);
   $('sheetBody').innerHTML = `<div class="center">
-    <p class="hint">출전 중인 불사조 <b>${pt.length}마리</b>(제한 없음)가 AI 불사조 군단과 자동으로 싸워요.<br>속성 상성: 🔥화 → 🍃풍 → 💧수 → 🔥화, 🔮영과 ✨신성은 모두에게 강해요.</p>
+    <p class="hint">출전 중인 불사조 <b>${pt.length} / ${PARTY_MAX}마리</b>가 AI 불사조 군단과 자동으로 싸워요.<br>속성 상성: 🔥화 → 🍃풍 → 💧수 → 🔥화, 🔮영과 ✨신성은 모두에게 강해요.</p>
     <div class="row" style="align-items:center">
       <button id="stPrev">◀</button>
       <div class="chip" style="font-size:16px">스테이지 <b>${N}</b>${N % 5 === 0 ? ' 👹보스' : ''}</div>
@@ -1318,7 +1347,7 @@ function renderBattlePrep() {
     </div>
     <label class="odds"><input type="checkbox" id="autoNext" ${G.autoNext ? 'checked' : ''}> 승리하면 자동으로 다음 스테이지 진행</label>
     <div class="odds" style="margin-top:8px">전투 아이템 (전투마다 1개씩 소모): ${BATTLE_ITEMS.map((it) => `<label style="margin:0 6px;white-space:nowrap;${inv(it.id) ? '' : 'opacity:.4'}"><input type="checkbox" data-bi="${it.id}" ${inv(it.id) && G.useNext && G.useNext[it.id] ? 'checked' : ''} ${inv(it.id) ? '' : 'disabled'}> ${it.icon}${it.name} ×${inv(it.id)}</label>`).join('')}<br><span>아이템은 🛒 상점에서 살 수 있어요.</span></div>
-    <div class="row"><button id="goBattle" class="primary" ${pt.length ? '' : 'disabled'}>⚔️ 전투 시작</button></div>
+    <div class="row"><button id="bestTeam">💪 가장 센 편성</button><button id="goBattle" class="primary" ${pt.length ? '' : 'disabled'}>⚔️ 전투 시작</button></div>
     <p class="hint" style="margin-top:14px">출전 불사조 (보관함에서 출전·해제)</p>
   </div>
   <div class="grid">${pt.sort(SORTS.power).map((p) => cardHTML(p)).join('') || '<p class="hint">출전 중인 불사조가 없어요.</p>'}</div>`;
@@ -1330,6 +1359,7 @@ function renderBattlePrep() {
   $('diffSel').onchange = (e) => { G.diff = e.target.value; save(); renderBattlePrep(); };
   $('fxSel').onchange = (e) => { G.fx = e.target.value; save(); };
   $('goBattle').onclick = () => startBattle(N);
+  $('bestTeam').onclick = () => bestPartyAction(renderBattlePrep);
   for (const cb of $('sheetBody').querySelectorAll('[data-bi]')) cb.onchange = () => { G.useNext = G.useNext || {}; G.useNext[cb.dataset.bi] = cb.checked; save(); };
   for (const el of $('sheetBody').querySelectorAll('.card-ph')) el.onclick = () => showDetail(byUid(+el.dataset.uid));
 }
@@ -1604,7 +1634,7 @@ function captureSuccess() {
   showModal('🎉 포획 성공!', `<div class="reveal" style="--glow: rgb(${C.glow})"><img src="${bigURL(p.c, p.st)}" alt=""></div>
     <p><b style="color:${RARITY_COL[C.rar]}">${RARITY[C.rar]}</b> ${esc(C.name)}${isNew ? ' <b style="color:#ffd04a">NEW!</b>' : ''}</p>
     <p>${ELEM[C.elem].i} ${STAGE_NAMES[p.st]} 불사조 · Lv.${p.lv} · 전투력 ${fmt(statsOf(p).power)}</p>`,
-    [{ label: '바로 출전', fn: () => { p.party = true; save(); exploreUI(); } }, { label: '계속 탐험', primary: true, fn: exploreUI }]);
+    [{ label: '바로 출전', fn: () => { if (setParty(p, true)) toast(`${nameOf(p)} 출전! (${party().length}/${PARTY_MAX})`); save(); exploreUI(); } }, { label: '계속 탐험', primary: true, fn: exploreUI }]);
   updateTop();
 }
 function captureFail() {
@@ -2281,6 +2311,7 @@ $('btnNew').onclick = () => {
     $('btnContinue').onclick = () => {
       G = Object.assign({ dexClaim: 0 }, saved);
       while (G.dex.length < NCOL) G.dex.push(0);
+      trimParty();
       begin();
     };
   }
