@@ -152,6 +152,13 @@ function render() {
 }
 
 // ---------- 플레이 화면 ----------
+function setHash(url: string) {
+  try {
+    history.replaceState(null, "", url);
+  } catch {
+    /* 샌드박스 환경 등에서 주소 변경이 막혀 있으면 무시 */
+  }
+}
 let runner: Runner | null = null;
 let current: GameEntry | null = null;
 
@@ -176,7 +183,7 @@ function play(no: number) {
     saveBest(e, score);
     updatePlayBar();
   });
-  history.replaceState(null, "", `#${no}`);
+  setHash(`#${no}`);
 }
 
 function closeGame(rerender = true) {
@@ -188,7 +195,7 @@ function closeGame(rerender = true) {
   current = null;
   $("play").classList.remove("on");
   if (rerender) {
-    history.replaceState(null, "", location.pathname);
+    setHash(location.pathname + location.search);
     render();
   }
 }
