@@ -1,8 +1,8 @@
 import "./style.css";
 import { Game } from "./game";
-import { LEVELS, REWARD, type LevelDef } from "./levels";
+import { LEVELS, REWARD, TREADMILL_MULT, type LevelDef } from "./levels";
 import { loadSave, writeSave, formatFull, formatShort } from "./save";
-import { UNITS, clampSpeed, formatSpeed, moveSpeedFor, parseSpeedText, BASE_MOVE } from "./speed";
+import { clampSpeed, formatSpeed, moveSpeedFor, BASE_MOVE } from "./speed";
 import type { TrailStyle } from "./effects";
 
 interface ShopItem {
@@ -40,16 +40,13 @@ hud.innerHTML = `
     <button id="btnShop">🛒 상점</button>
     <button id="btnLevels">🗺️ 레벨</button>
   </div>
-  <div class="help">WASD/방향키: 이동 · Space: 점프 · 마우스 드래그: 시점 · 휠: 줌 · R: 처음부터</div>
+  <div class="help">키보드를 누를수록 빨라져요 · WASD/방향키: 이동 · Space: 장애물 점프 · 드래그: 시점 · R: 처음부터</div>
   <div id="toast"></div>
   <div class="speedbar panel">
     <div class="speed-row">
       <span class="label">⚡ 속도</span>
-      <input id="speedInput" inputmode="decimal" placeholder="숫자 (예: 5 또는 5m)" />
-      <div class="units">
-        ${UNITS.map((u, i) => `<button class="unit" data-unit="${u.key}" title="${u.name}">${u.key}<small>${"▶".repeat(i + 1)}</small></button>`).join("")}
-      </div>
-      <button id="speedReset" class="ghost">기본</button>
+      <b id="speedValue" class="speed-value">1</b>
+      <span id="tapPop" class="tap-pop"></span>
     </div>
     <div class="speed-now" id="speedNow"></div>
   </div>
@@ -58,6 +55,7 @@ hud.innerHTML = `
       <button data-k="KeyW">▲</button><button data-k="KeyA">◀</button><button data-k="KeyS">▼</button><button data-k="KeyD">▶</button>
     </div>
     <button class="jump" data-k="Space">점프</button>
+    <button class="tap" data-tap>⌨️ 누르기</button>
   </div>
 `;
 app.appendChild(hud);
@@ -67,7 +65,6 @@ overlay.id = "overlay";
 app.appendChild(overlay);
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const speedInput = $<HTMLInputElement>("speedInput");
 let currentLevel: LevelDef | null = null;
 
 function persist(): void {
@@ -82,17 +79,33 @@ function refreshTrophies(): void {
 
 function refreshSpeed(): void {
   const mult = moveSpeedFor(save.speed) / BASE_MOVE;
-  $("speedNow").innerHTML =
-    `현재 속도 <b>${formatSpeed(save.speed)}</b> · 이동 ×${mult.toFixed(2)} ` +
-    `<span class="order">빠르기: k &lt; m &lt; b &lt; t · 숫자가 클수록 빨라져요</span>`;
+  $("speedValue").textContent = formatSpeed(save.speed);
+  const onMill = game.onTreadmill() > 1;
+  $("speedNow").innerHTML = onMill
+    ? `<span class="mill">🏃 ${TREADMILL_MULT}× 런닝기구 위! 키 한 번에 +${TREADMILL_MULT}</span> · 이동 ×${mult.toFixed(2)}`
+    : `키 한 번에 +1 · 이동 ×${mult.toFixed(2)} · <span class="order">${TREADMILL_MULT}× 런닝기구 위에서 누르면 ${TREADMILL_MULT}배!</span>`;
   game.setMoveSpeed(moveSpeedFor(save.speed));
 }
 
-function setSpeed(v: number): void {
-  save.speed = clampSpeed(v);
-  persist();
+let lastSaved = 0;
+let popTimer = 0;
+/** 키를 누를 때마다 속도가 올라간다 */
+function tapSpeed(): void {
+  const gain = game.tapGain();
+  save.speed = clampSpeed(save.speed + gain);
+  const now = performance.now();
+  if (now - lastSaved > 500) {
+    lastSaved = now;
+    persist();
+  }
   refreshSpeed();
-  toast(`⚡ 속도 ${formatSpeed(save.speed)}`);
+  const pop = $("tapPop");
+  pop.textContent = `+${formatSpeed(gain)}`;
+  pop.classList.remove("show");
+  void pop.offsetWidth;
+  pop.classList.add("show");
+  clearTimeout(popTimer);
+  popTimer = window.setTimeout(() => pop.classList.remove("show"), 400);
 }
 
 function applyCosmetics(): void {
@@ -109,32 +122,6 @@ function toast(msg: string): void {
   toastTimer = window.setTimeout(() => t.classList.remove("show"), 1600);
 }
 
-// 속도 입력
-document.querySelectorAll<HTMLButtonElement>(".unit").forEach((btn) =>
-  btn.addEventListener("click", () => {
-    const unit = UNITS.find((u) => u.key === btn.dataset.unit)!;
-    const raw = speedInput.value.trim().replace(/[kmbt]$/i, "");
-    const n = raw === "" ? 1 : parseFloat(raw);
-    if (!(n > 0)) return toast("숫자를 입력하세요");
-    speedInput.value = `${n}`;
-    setSpeed(n * unit.mult);
-    btn.blur();
-  }),
-);
-speedInput.addEventListener("keydown", (e) => {
-  e.stopPropagation();
-  if (e.key !== "Enter") return;
-  const v = parseSpeedText(speedInput.value);
-  if (v === null) return toast("예: 5, 2.5k, 10m, 3b, 1t");
-  setSpeed(v);
-  speedInput.blur();
-});
-$("speedReset").addEventListener("click", (e) => {
-  speedInput.value = "";
-  setSpeed(1);
-  (e.currentTarget as HTMLElement).blur();
-});
-
 // 터치 버튼
 document.querySelectorAll<HTMLButtonElement>(".touch [data-k]").forEach((b) => {
   const k = b.dataset.k!;
@@ -144,6 +131,26 @@ document.querySelectorAll<HTMLButtonElement>(".touch [data-k]").forEach((b) => {
   });
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, () => game.setVirtualKey(k, false));
 });
+
+document.querySelector<HTMLButtonElement>("[data-tap]")!.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  if (currentLevel && !overlay.classList.contains("show")) tapSpeed();
+});
+window.addEventListener("keydown", (e) => {
+  if (e.repeat || !currentLevel || overlay.classList.contains("show")) return;
+  tapSpeed();
+});
+window.addEventListener("beforeunload", persist);
+// 런닝기구에 올라가고 내려올 때 안내 문구 갱신
+let wasOnMill = false;
+setInterval(() => {
+  const on = game.onTreadmill() > 1;
+  if (on !== wasOnMill) {
+    wasOnMill = on;
+    refreshSpeed();
+    if (on) toast(`🏃 ${TREADMILL_MULT}× 런닝기구! 키보드를 마구 누르세요`);
+  }
+}, 150);
 
 // ---------- 화면들 ----------
 function showOverlay(html: string): void {
@@ -175,7 +182,7 @@ function showMenu(): void {
   }).join("");
   showOverlay(`
     <h1>⌨️ 키보드 월드</h1>
-    <p class="lead">거대한 키보드 위를 달려 <b class="enter">Enter</b> 키에 도착하면 성공!<br/>
+    <p class="lead">키보드를 누를수록 빨라져요! 장애물은 점프로 넘고 <b class="enter">Enter</b> 키에 도착하면 성공!<br/>
     성공 보상: <b class="gold">${formatFull(REWARD)} 🏆</b></p>
     <div class="levels">${cards}</div>
     <div class="actions">
@@ -300,7 +307,6 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-if (save.speed > 1) speedInput.value = formatSpeed(save.speed);
 refreshTrophies();
 refreshSpeed();
 applyCosmetics();

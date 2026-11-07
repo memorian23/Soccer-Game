@@ -61,22 +61,15 @@ button.on { background: #2fbf66; }
 
 .speedbar {
   position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-  padding: 10px 14px; width: min(680px, calc(100% - 32px));
+  padding: 10px 14px; width: min(520px, calc(100% - 32px));
 }
 .speed-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .speed-row .label { font-weight: 800; }
-#speedInput {
-  flex: 1 1 150px; min-width: 120px; font: inherit; color: var(--text);
-  background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
-}
-#speedInput:focus { outline: 2px solid var(--accent); }
-.units { display: flex; gap: 6px; }
-.unit { min-width: 52px; display: flex; flex-direction: column; align-items: center; line-height: 1.1; text-transform: uppercase; font-size: 17px; }
-.unit small { font-size: 8px; color: var(--gold); letter-spacing: -1px; }
-.unit[data-unit="k"] { background: #3c8f6e; }
-.unit[data-unit="m"] { background: #3d6fd6; }
-.unit[data-unit="b"] { background: #8a46d8; }
-.unit[data-unit="t"] { background: #d8464f; }
+.speed-value { font-size: 26px; color: var(--gold); font-variant-numeric: tabular-nums; min-width: 60px; text-align: center; }
+.tap-pop { color: #7dffa8; font-weight: 800; opacity: 0; transform: translateY(0); }
+.tap-pop.show { animation: pop 0.4s ease-out; }
+@keyframes pop { 0% { opacity: 1; transform: translateY(0) scale(1.2); } 100% { opacity: 0; transform: translateY(-14px) scale(1); } }
+.speed-now .mill { color: #7dffa8; font-weight: 700; }
 .speed-now { text-align: center; margin-top: 6px; font-size: 13px; color: var(--muted); }
 .speed-now b { color: var(--gold); font-size: 15px; }
 .speed-now .order { margin-left: 8px; opacity: 0.8; }
@@ -93,6 +86,7 @@ button.on { background: #2fbf66; }
   .touch .pad [data-k="KeyS"] { grid-column: 2; grid-row: 2; }
   .touch .pad [data-k="KeyD"] { grid-column: 3; grid-row: 2; }
   .touch .jump { position: absolute; right: 16px; bottom: 140px; width: 84px; height: 84px; border-radius: 50%; }
+  .touch .tap { position: absolute; right: 16px; bottom: 236px; width: 84px; height: 60px; background: #2fbf66; }
   .help { display: none; }
 }
 

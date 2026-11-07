@@ -57,6 +57,51 @@ function labelTexture(label: string, w: number, d: number, bg: string, fg: strin
   return tex;
 }
 
+/** 런닝기구 벨트 무늬 (움직이는 텍스처) */
+function beltTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 64;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#23252f";
+  g.fillRect(0, 0, 64, 64);
+  g.fillStyle = "#3a3d4c";
+  for (let y = 0; y < 64; y += 16) g.fillRect(0, y, 64, 6);
+  g.fillStyle = "#ffd04a";
+  g.fillRect(0, 0, 5, 64);
+  g.fillRect(59, 0, 5, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1, 4);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 공중에 떠 있는 간판 */
+function makeSign(text: string): THREE.Sprite {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 160;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "rgba(20,14,44,0.85)";
+  g.beginPath();
+  g.roundRect(4, 4, 504, 152, 30);
+  g.fill();
+  g.strokeStyle = "#ffd04a";
+  g.lineWidth = 6;
+  g.stroke();
+  g.fillStyle = "#ffd04a";
+  g.font = 'bold 64px "Segoe UI", "Malgun Gothic", sans-serif';
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(text, 256, 82);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false }));
+  sp.scale.set(4.2, 1.3, 1);
+  return sp;
+}
+
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
@@ -65,6 +110,8 @@ export class Game {
   private levelGroup = new THREE.Group();
   private keys: KeyBody[] = [];
   private trophy: THREE.Object3D | null = null;
+  private belts: THREE.Texture[] = [];
+  private tapAnim = 0;
 
   private player = new THREE.Group();
   private model = new THREE.Group();
@@ -211,6 +258,7 @@ export class Game {
     this.levelGroup.clear();
     this.keys = [];
     this.trophy = null;
+    this.belts = [];
 
     for (const kd of def.keys) {
       const w = kd.w ?? 2;
@@ -221,10 +269,16 @@ export class Game {
         normal: [def.color, "#1b1d2a"],
         checkpoint: ["#ffd84a", "#4a3300"],
         goal: ["#46e07a", "#063015"],
+        obstacle: ["#ff5a5a", "#4a0000"],
+        treadmill: ["#2a2d3a", "#ffd04a"],
       };
       const [bg, fg] = colors[type];
       const side = new THREE.MeshStandardMaterial({ color: new THREE.Color(bg).multiplyScalar(0.7), roughness: 0.55 });
-      const top = new THREE.MeshStandardMaterial({ map: labelTexture(kd.label, w, d, bg, fg), roughness: 0.45 });
+      const top = new THREE.MeshStandardMaterial({
+        map: type === "treadmill" ? beltTexture() : labelTexture(kd.label, w, d, bg, fg),
+        roughness: 0.45,
+      });
+      if (type === "obstacle") side.emissive = new THREE.Color(0x400000);
       if (type === "goal") {
         top.emissive = new THREE.Color(0x1f8040);
         side.emissive = new THREE.Color(0x0f4020);
@@ -236,6 +290,13 @@ export class Game {
       mesh.position.set(base.x, base.y - KEY_THICK / 2, base.z);
       this.levelGroup.add(mesh);
       this.keys.push({ def: kd, mesh, base, pos: base.clone(), delta: new THREE.Vector3(), w, d, activated: false });
+
+      if (type === "treadmill") {
+        this.belts.push(top.map!);
+        const sign = makeSign(kd.label);
+        sign.position.set(base.x, base.y + 3, base.z);
+        this.levelGroup.add(sign);
+      }
 
       if (type === "goal") {
         const trophy = new THREE.Group();
@@ -343,10 +404,24 @@ export class Game {
     } else this.input.delete(code);
   }
 
+  /** 키를 한 번 눌렀을 때 얻는 속도 (런닝기구 위에서는 배수 적용) */
+  tapGain(): number {
+    this.tapAnim = 0.35;
+    return this.onTreadmill();
+  }
+
+  /** 서 있는 런닝기구의 배수, 런닝기구가 아니면 1 */
+  onTreadmill(): number {
+    const k = this.groundKey;
+    return this.grounded && k && k.def.type === "treadmill" ? k.def.mult ?? 1 : 1;
+  }
+
   // ---------- 업데이트 ----------
 
   private update(dt: number): void {
     this.time += dt;
+    this.tapAnim = Math.max(0, this.tapAnim - dt);
+    for (const b of this.belts) b.offset.y = (b.offset.y - dt * 1.5) % 1;
     if (this.trophy) {
       this.trophy.rotation.y += dt * 1.5;
       this.trophy.position.y = this.keys.find((k) => k.def.type === "goal")!.pos.y + 2.2 + Math.sin(this.time * 2) * 0.2;
@@ -450,9 +525,10 @@ export class Game {
     }
 
     // 캐릭터 모습
-    const bob = moving && this.grounded ? Math.abs(Math.sin(this.time * (8 + this.moveSpeed * 0.3))) * 0.12 : 0;
+    const running = (moving || (this.tapAnim > 0 && this.onTreadmill() > 1)) && this.grounded;
+    const bob = running ? Math.abs(Math.sin(this.time * (8 + this.moveSpeed * 0.3))) * 0.12 : 0;
     this.model.position.y = bob;
-    this.model.rotation.x = moving ? -Math.min(0.45, this.moveSpeed * 0.008) : 0;
+    this.model.rotation.x = running ? -Math.min(0.45, this.moveSpeed * 0.008) : 0;
     const squash = this.grounded ? 1 : 1.06;
     this.model.scale.set(1 / Math.sqrt(squash), squash, 1 / Math.sqrt(squash));
   }

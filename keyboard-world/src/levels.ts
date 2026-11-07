@@ -1,4 +1,4 @@
-export type KeyType = "start" | "normal" | "checkpoint" | "goal";
+export type KeyType = "start" | "normal" | "checkpoint" | "goal" | "obstacle" | "treadmill";
 
 export interface KeyMove {
   axis: "x" | "y" | "z";
@@ -17,115 +17,142 @@ export interface KeyDef {
   d?: number;
   type?: KeyType;
   move?: KeyMove;
+  /** 런닝기구 배수 */
+  mult?: number;
 }
 
 export interface LevelDef {
   id: number;
   name: string;
   desc: string;
-  color: string; // 키캡 색
+  color: string; // 길 키캡 색
   keys: KeyDef[];
 }
 
 /** 성공 보상 */
 export const REWARD = 100000000000000n;
+/** 런닝기구 배수 */
+export const TREADMILL_MULT = 100;
 
-const start = (z = 0, y = 0, x = 0): KeyDef => ({ label: "Esc", x, z, y, w: 3.2, d: 3.2, type: "start" });
-const goal = (z: number, y = 0, x = 0): KeyDef => ({ label: "Enter", x, z, y, w: 3.2, d: 3.2, type: "goal" });
+const TRACK_W = 7;
+const SEG = 10;
+const HUB_D = 10;
+const LETTERS = "QWERTYUIOPASDFGHJKLZXCVBNM";
+const OB_LABELS = ["Del", "Ins", "Tab", "Caps", "Alt", "Ctrl", "Shift", "Back"];
 
-function level1(): KeyDef[] {
-  const keys: KeyDef[] = [start()];
-  const letters = "QWERTYUIOP".split("");
-  letters.forEach((l, i) =>
-    keys.push({ label: l, x: 0, z: -3.6 - i * 2.5, type: l === "T" ? "checkpoint" : "normal" }),
-  );
-  keys.push(goal(-3.6 - (letters.length - 1) * 2.5 - 3.2));
-  return keys;
+interface Obstacle {
+  /** 출발선에서부터의 거리 */
+  at: number;
+  x?: number;
+  w?: number;
+  /** 장애물 높이 (점프로 넘을 수 있는 높이) */
+  h?: number;
+  move?: KeyMove;
 }
 
-function level2(): KeyDef[] {
-  const keys: KeyDef[] = [start()];
-  const letters = ["A", "S", "D", "F", "G", "H", "J", "K", "L", ";", "'"];
-  letters.forEach((l, i) =>
-    keys.push({ label: l, x: i % 2 ? 1.3 : -1.3, z: -4 - i * 3.4, type: l === "G" ? "checkpoint" : "normal" }),
-  );
-  keys.push(goal(-4 - (letters.length - 1) * 3.4 - 4));
-  return keys;
-}
-
-function level3(): KeyDef[] {
-  const keys: KeyDef[] = [start()];
-  const labels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="];
-  labels.forEach((l, i) =>
-    keys.push({ label: l, x: 0, z: -4 - i * 3, y: (i + 1) * 0.7, type: l === "6" ? "checkpoint" : "normal" }),
-  );
-  keys.push(goal(-4 - (labels.length - 1) * 3 - 3.6, (labels.length + 1) * 0.7));
-  return keys;
-}
-
-function level4(): KeyDef[] {
-  const keys: KeyDef[] = [start()];
-  const labels = ["Z", "X", "C", "V", "B", "N", "M", ",", ".", "/"];
-  labels.forEach((l, i) => {
-    const k: KeyDef = { label: l, x: 0, z: -4.2 - i * 3.4 };
-    if (l === "B") k.type = "checkpoint";
-    else if (i % 2 === 0) k.move = { axis: "y", amp: 1, speed: 2, phase: i };
-    else k.move = { axis: "x", amp: 2.2, speed: 1.4, phase: i };
-    keys.push(k);
-  });
-  keys.push(goal(-4.2 - (labels.length - 1) * 3.4 - 3.8));
-  return keys;
-}
-
-function level5(): KeyDef[] {
-  const keys: KeyDef[] = [start()];
-  const heights = [0, 0.8, 0.4, 1.2, 0.6, 1.2, 1.8, 1.2, 2, 1.4, 2.2, 1.6];
-  for (let i = 0; i < 12; i++) {
-    const label = `F${i + 1}`;
-    const k: KeyDef = { label, x: 0, z: -4.5 - i * 3.5, y: heights[i], w: 1.5, d: 1.5 };
-    if (label === "F6") {
-      k.type = "checkpoint";
-      k.w = k.d = 2.2;
-    } else if (i === 2 || i === 7 || i === 10) k.move = { axis: "x", amp: 2.5, speed: 1.6, phase: i };
-    else if (i === 8) k.move = { axis: "y", amp: 0.8, speed: 1.8 };
-    keys.push(k);
-  }
-  const lastZ = -4.5 - 11 * 3.5;
-  keys.push({ label: "Space", x: 0, z: lastZ - 4, y: 1.6, w: 9, d: 2.2, move: { axis: "x", amp: 3, speed: 1.1 } });
-  keys.push(goal(lastZ - 8.2, 1.6));
-  return keys;
-}
-
-function level6(): KeyDef[] {
-  const keys: KeyDef[] = [start()];
-  const labels = [
-    "Home", "End", "PgUp", "PgDn", "Ins", "Del", "Tab", "Caps",
-    "Shift", "Ctrl", "Alt", "Fn", "Win", "Menu", "PrtSc", "Pause",
+/**
+ * 출발 광장(100× 런닝기구 포함) + 일자 달리기 길 + 장애물 + Enter 골.
+ * 길은 틈 없이 이어져 있어서 점프는 장애물을 넘을 때만 쓴다.
+ */
+function course(length: number, obstacles: Obstacle[], checkpoints: number[] = []): KeyDef[] {
+  const keys: KeyDef[] = [
+    { label: "Esc", x: 0, z: 0, w: 14, d: HUB_D, type: "start" },
+    { label: `${TREADMILL_MULT}× 런닝기구`, x: -4.5, z: 0.5, y: 0.25, w: 3, d: 6, type: "treadmill", mult: TREADMILL_MULT },
   ];
-  const radius = 5;
-  labels.forEach((l, i) => {
-    const a = -Math.PI / 2 - i * ((40 * Math.PI) / 180);
-    const k: KeyDef = {
-      label: l,
-      x: Math.cos(a) * radius,
-      z: Math.sin(a) * radius,
-      y: (i + 1) * 0.8,
-      w: 1.9,
-      d: 1.9,
-      type: l === "Shift" ? "checkpoint" : "normal",
-    };
-    if (i % 5 === 3) k.move = { axis: "y", amp: 0.6, speed: 2.2, phase: i };
-    keys.push(k);
-  });
-  keys.push(goal(0, (labels.length + 1) * 0.8));
+  const startZ = -HUB_D / 2;
+  const segs = Math.ceil(length / SEG);
+  for (let i = 0; i < segs; i++) {
+    keys.push({
+      label: LETTERS[i % LETTERS.length],
+      x: 0,
+      z: startZ - SEG / 2 - i * SEG,
+      w: TRACK_W,
+      d: SEG,
+      type: checkpoints.includes(i) ? "checkpoint" : "normal",
+    });
+  }
+  obstacles.forEach((o, i) =>
+    keys.push({
+      label: OB_LABELS[i % OB_LABELS.length],
+      x: o.x ?? 0,
+      z: startZ - o.at,
+      y: o.h ?? 1.1,
+      w: o.w ?? TRACK_W,
+      d: 0.9,
+      type: "obstacle",
+      move: o.move,
+    }),
+  );
+  keys.push({ label: "Enter", x: 0, z: startZ - segs * SEG - 2, w: TRACK_W, d: 4, type: "goal" });
   return keys;
 }
+
+const every = (from: number, to: number, step: number) => {
+  const r: number[] = [];
+  for (let v = from; v <= to; v += step) r.push(v);
+  return r;
+};
 
 export const LEVELS: LevelDef[] = [
-  { id: 1, name: "QWERTY 산책", desc: "한 줄로 놓인 키를 건너 Enter까지!", color: "#8ecbff", keys: level1() },
-  { id: 2, name: "ASDF 지그재그", desc: "좌우로 엇갈린 키를 뛰어넘자", color: "#a5f0b5", keys: level2() },
-  { id: 3, name: "숫자 계단", desc: "1부터 =까지 점점 높아지는 계단", color: "#ffd38a", keys: level3() },
-  { id: 4, name: "움직이는 키", desc: "눌리고 미끄러지는 키보드", color: "#ff9fc8", keys: level4() },
-  { id: 5, name: "F키 지옥", desc: "작은 F키와 움직이는 스페이스바", color: "#c7a6ff", keys: level5() },
-  { id: 6, name: "특수키 나선탑", desc: "빙글빙글 올라가 꼭대기 Enter로", color: "#ff8f7a", keys: level6() },
+  {
+    id: 1,
+    name: "첫 달리기",
+    desc: "낮은 벽 3개를 점프로 넘어 Enter까지",
+    color: "#8ecbff",
+    keys: course(60, [{ at: 15 }, { at: 30 }, { at: 45 }]),
+  },
+  {
+    id: 2,
+    name: "장애물 달리기",
+    desc: "벽이 많아졌어요. 옆으로 피해도 돼요",
+    color: "#a5f0b5",
+    keys: course(
+      100,
+      [
+        { at: 12 }, { at: 24 }, { at: 36, w: 3.5, x: -1.75 }, { at: 48 },
+        { at: 60, w: 3.5, x: 1.75 }, { at: 72 }, { at: 84, h: 1.4 },
+      ],
+      [5],
+    ),
+  },
+  {
+    id: 3,
+    name: "미끄러지는 벽",
+    desc: "좌우로 움직이는 벽을 피하거나 넘어가요",
+    color: "#ffd38a",
+    keys: course(
+      120,
+      every(12, 108, 12).map((at, i) =>
+        i % 3 === 2 ? { at } : { at, w: 2.5, move: { axis: "x", amp: 2.2, speed: 1.6, phase: i } },
+      ),
+      [6],
+    ),
+  },
+  {
+    id: 4,
+    name: "오르내리는 벽",
+    desc: "벽이 낮아질 때 점프해서 넘어가요",
+    color: "#ff9fc8",
+    keys: course(
+      120,
+      every(12, 108, 12).map((at, i) => ({ at, h: 1.2, move: { axis: "y", amp: 1, speed: 2, phase: i * 0.8 } })),
+      [6],
+    ),
+  },
+  {
+    id: 5,
+    name: "최종 질주",
+    desc: "모든 장애물이 한꺼번에! 가장 긴 코스",
+    color: "#c7a6ff",
+    keys: course(
+      200,
+      every(10, 190, 10).map((at, i) => {
+        if (i % 4 === 0) return { at };
+        if (i % 4 === 1) return { at, w: 2.5, move: { axis: "x", amp: 2.2, speed: 2, phase: i } };
+        if (i % 4 === 2) return { at, h: 1.2, move: { axis: "y", amp: 1, speed: 2.2, phase: i } };
+        return { at, w: 3.5, x: i % 8 === 3 ? -1.75 : 1.75, h: 1.4 };
+      }),
+      [6, 13],
+    ),
+  },
 ];
